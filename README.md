@@ -160,6 +160,7 @@ Simple Earn APR, Futures 펀딩비, 시장 가격, 유동성은 빠르게 변할
 ## 문서
 
 - [요구 분석 문서](./REQUIREMENTS.md)
+- [UML 및 아키텍처 문서](./ARCHITECTURE.md)
 
 ## 현재 상태
 
