@@ -607,7 +607,184 @@ Secret Manager는 AWS Secrets Manager, Google Secret Manager, Azure Key Vault, H
 - 한국어 단일 UI
 - 다국어 지원은 후속 확장
 
-## 14. 핵심 성공 기준
+## 14. Telegram 알림 연동 설계
+
+### 14.1 기존 봇 사용
+
+알림은 기존에 만들어둔 Telegram 봇 `@Tturu_news_bot`을 사용한다. 기존 로컬 프로젝트 `C:\Users\jimin\.openclaw\workspace\telegram-news`를 확인한 결과, Bot API의 `sendMessage` 엔드포인트를 사용해 개인 Telegram 사용자 ID로 메시지를 보내는 구조다.
+
+새 프로젝트에서는 기존 봇 프로그램에 직접 의존하지 않고, 동일한 방식의 독립 Notification Worker를 구현한다.
+
+필요 환경변수는 다음과 같다.
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+기존 프로젝트에서는 수신자 ID를 `MY_TELEGRAM_USER_ID`라는 이름으로 사용하고 있으므로, 새 프로젝트의 `.env`에서는 다음 중 하나를 선택한다.
+
+- 새 프로젝트 표준 이름: `TELEGRAM_CHAT_ID`
+- 기존 값 재사용: `MY_TELEGRAM_USER_ID` 값을 `TELEGRAM_CHAT_ID`에 복사
+
+### 14.2 전송 방식
+
+Telegram 알림 전송은 다음 방식으로 구현한다.
+
+```text
+POST https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage
+```
+
+전송 payload는 다음 필드를 기본으로 한다.
+
+- `chat_id`: 수신자 Telegram chat ID
+- `text`: 알림 메시지 본문
+- `parse_mode`: Markdown 또는 HTML
+- `disable_web_page_preview`: true
+
+Telegram 메시지 길이 제한을 고려해 긴 메시지는 여러 개로 나누어 보낸다.
+
+### 14.3 알림 종류
+
+MVP에서 보낼 알림은 다음과 같다.
+
+- 신규 Simple Earn 공지 발견
+- 특정 토큰의 이벤트 APR 감지
+- 고APR Flexible Earn 상품 발견
+- Earn APR 대비 Futures 펀딩비를 차감한 예상 순APR이 기준 이상인 경우
+- Binance 내부 arbitrage 후보가 기준 이상인 경우
+- 데이터 수집 실패가 반복되는 경우
+
+### 14.4 보안 주의사항
+
+Telegram Bot Token은 비밀번호와 같은 비밀값으로 취급한다.
+
+- `.env`에만 저장한다.
+- GitHub에 커밋하지 않는다.
+- 로그에 Bot Token이 포함되지 않게 한다.
+- 기존 로그에 Bot Token이 노출되어 있다면 BotFather에서 토큰 재발급을 검토한다.
+
+## 15. 운영 및 배포 전략
+
+### 15.1 로컬 MVP
+
+초기 MVP는 로컬 개인용 앱으로 시작한다.
+
+로컬 실행의 장점은 다음과 같다.
+
+- 개발과 디버깅이 쉽다.
+- 비용이 없다.
+- API Key를 외부 서버에 올리지 않아도 된다.
+- GitHub에서 clone한 사용자가 자기 환경에서 실행하기 쉽다.
+
+단점은 다음과 같다.
+
+- 컴퓨터가 꺼지면 알림과 수집도 멈춘다.
+- Windows 절전, 네트워크 끊김, 재부팅에 취약하다.
+- 외부에서 대시보드에 접속하려면 별도 터널링이 필요하다.
+
+### 15.2 EC2 서버 접속 방식
+
+24시간 운영 단계에서는 AWS EC2 또는 Lightsail 같은 클라우드 서버에 앱을 띄우고, 사용자의 개인 컴퓨터에서 해당 서버의 대시보드에 접속한다.
+
+이 방식은 다음 상황에 적합하다.
+
+- 로컬 PC를 꺼도 데이터 수집과 Telegram 알림이 계속 돌아가야 할 때
+- 외부 네트워크에서도 같은 대시보드에 접속하고 싶을 때
+- API 수집 worker와 웹 UI를 하나의 서버에서 안정적으로 운영하고 싶을 때
+
+접속 방식은 다음 중 하나를 선택한다.
+
+- EC2 보안 그룹에서 특정 IP만 웹 포트 접근 허용
+- SSH 터널링으로 로컬 포트에 EC2 대시보드를 연결
+- Tailscale 또는 Cloudflare Tunnel로 인증된 사용자만 접근
+- 도메인과 HTTPS를 붙이고 로그인 인증 추가
+
+MVP 이후 24시간 운영에는 "서버에 앱을 배포하고 내 컴퓨터에서 서버 대시보드에 접속"하는 구조를 기본 방향으로 둔다.
+
+### 15.3 클라우드 서버 방식
+
+24시간 운영을 목표로 하면 AWS EC2, Amazon Lightsail, Oracle Cloud VM, Hetzner VPS 같은 작은 Linux 서버에 배포하는 방식을 검토한다.
+
+MVP 기준 권장 운영 방식은 다음과 같다.
+
+1. 로컬에서 기능을 완성한다.
+2. Docker 기반으로 재현 가능한 실행 환경을 만든다.
+3. 작은 VPS 또는 Lightsail 인스턴스에 배포한다.
+4. 백그라운드 worker가 가격, Simple Earn, 공지, arbitrage 데이터를 계속 수집한다.
+5. 웹 UI는 사용자의 개인 컴퓨터에서 EC2/Lightsail 서버 주소로 접속한다.
+6. 외부 노출을 줄이기 위해 SSH 터널링, IP allowlist, Tailscale, Cloudflare Tunnel 중 하나로 접근을 제한한다.
+
+### 15.4 EC2와 Lightsail 비교
+
+| 방식 | 장점 | 단점 | 적합도 |
+| --- | --- | --- | --- |
+| 로컬 실행 | 무료, 개발 쉬움, 키 관리 단순 | PC가 꺼지면 중단, 외부 접속 불편 | 개발/MVP |
+| EC2/Lightsail + SSH 터널링 | 서버는 24시간 운영하고 대시보드는 내 컴퓨터에서 안전하게 접속 가능 | SSH 접속 관리 필요 | 개인용 24시간 운영 |
+| AWS EC2 | 유연성 높음, 확장 쉬움 | 설정과 비용 관리가 비교적 복잡 | 장기 운영 |
+| Amazon Lightsail | 월 비용 예측 쉬움, VPS처럼 단순 | EC2보다 세밀한 제어는 제한 | 개인용 24시간 운영 |
+
+초기 24시간 운영은 EC2보다 Lightsail 또는 작은 VPS가 더 단순하다. 단, AWS 생태계 안에서 확장할 계획이 강하면 EC2로 시작해도 된다.
+
+### 15.5 예상 서버 유지비
+
+초기 24시간 운영 비용은 작은 Linux 서버 1대 기준으로 월 5달러에서 20달러 사이를 1차 예산으로 잡는다. 실제 금액은 AWS 리전, 인스턴스 타입, public IPv4 사용 여부, 디스크 크기, 데이터 전송량에 따라 달라진다.
+
+| 구성 | 예상 월 비용 | 비고 |
+| --- | --- | --- |
+| Amazon Lightsail 1GB Linux | 약 5달러/월 | 개인용 24시간 운영에 가장 단순한 후보 |
+| Amazon Lightsail IPv6-only 소형 플랜 | 약 3.5달러/월부터 | IPv6-only 접근이 가능하면 더 저렴할 수 있음 |
+| EC2 t3.micro/t4g.micro급 Linux | 약 8달러에서 15달러/월 이상 | 리전별 인스턴스 가격, EBS, public IPv4 비용을 합산해야 함 |
+| EC2 + public IPv4 | public IPv4만 약 3.65달러/월 추가 가능 | AWS public IPv4 과금 기준 0.005달러/시간 |
+| EC2/Lightsail + 도메인 | 도메인 비용 별도 | Route 53 또는 외부 DNS 사용 시 별도 비용 |
+
+MVP 운영 추천은 다음과 같다.
+
+- 비용 예측과 설정 단순성이 중요하면 Lightsail을 우선 검토한다.
+- AWS IAM, VPC, 보안 그룹, 확장 구성을 더 세밀하게 다루고 싶으면 EC2를 검토한다.
+- public IPv4 비용을 줄이고 싶으면 IPv6-only, SSH 터널링, Tailscale, Cloudflare Tunnel 조합을 검토한다.
+- 시작 단계에서는 managed DB를 쓰지 않고 SQLite 파일로 운영해 비용을 줄인다.
+
+### 15.6 Docker 기반 배포 전략
+
+AWS 서버에서 환경설정을 반복하지 않기 위해 Docker를 기본 배포 단위로 사용한다.
+
+목표는 다음과 같다.
+
+- 로컬과 서버에서 같은 명령으로 실행한다.
+- Python/Node 버전, 시스템 패키지, 앱 의존성 차이를 줄인다.
+- EC2 또는 Lightsail에 Docker만 설치하면 앱을 실행할 수 있게 한다.
+- `.env` 파일만 서버에 따로 배치하고 이미지는 GitHub에서 빌드하거나 서버에서 빌드한다.
+- worker, scheduler, web app을 Docker Compose로 함께 실행한다.
+
+초기 Docker 구성 후보는 다음과 같다.
+
+```text
+docker-compose.yml
+Dockerfile
+.dockerignore
+.env.example
+data/
+```
+
+초기에는 단일 컨테이너 또는 2개 컨테이너로 시작한다.
+
+- `web`: 대시보드 UI 및 API 서버
+- `worker`: 가격, Simple Earn, 공지, arbitrage 수집 및 Telegram 알림
+
+SQLite를 사용할 경우 `./data` 디렉터리를 volume으로 연결해 컨테이너 재시작 후에도 데이터가 유지되게 한다. PostgreSQL과 Redis는 배포형 확장 단계에서 Docker Compose 서비스로 추가한다.
+
+### 15.7 운영 우선순위
+
+현재 프로젝트 단계에서는 다음 순서를 따른다.
+
+1. 로컬 MVP 완성
+2. Telegram 알림 안정화
+3. Dockerfile 및 Docker Compose 추가
+4. 로컬 장시간 실행 테스트
+5. Lightsail 또는 EC2 배포 검토
+6. EC2/Lightsail에 배포
+7. SSH 터널링, IP allowlist, Tailscale, Cloudflare Tunnel 중 하나로 대시보드 접근 제한
+
+## 16. 핵심 성공 기준
 
 이 프로젝트가 성공했다고 판단할 수 있는 기준은 다음과 같다.
 
@@ -618,7 +795,7 @@ Secret Manager는 AWS Secrets Manager, Google Secret Manager, Azure Key Vault, H
 - 차익거래 후보가 기준을 넘으면 즉시 알림을 받을 수 있다.
 - 사용자가 실제 투자 전에 수익뿐 아니라 리스크를 함께 판단할 수 있다.
 
-## 15. 오픈 질문
+## 17. 오픈 질문
 
 다음 항목은 구현 전 추가 결정이 필요하다.
 
@@ -635,3 +812,7 @@ Secret Manager는 AWS Secrets Manager, Google Secret Manager, Azure Key Vault, H
 | 공지 수집 주기는 몇 분 단위가 적절한가? | 공지는 30분 간격. 단 APR 변동 대응을 위해 Simple Earn 상품 데이터는 더 빠르게 갱신한다. | 공지 collector는 30분 주기, Simple Earn Flexible collector는 1분에서 5분 주기로 분리한다. 화면에는 수동 새로고침을 제공한다. |
 | 신규 공지 발견 시 알림을 보낼 것인가? | 알림을 보낸다. | 신규 공지 URL 또는 ID 감지 시 Telegram 알림을 발송하고 중복 발송을 방지한다. |
 | 공지 상세에서 APR과 조건을 자동 파싱할 것인가? | 특정 토큰에 대한 APR과 조건을 파싱해서 보여준다. | 공지 상세 parser가 토큰 심볼, APR, 이벤트 기간, 참여 조건, 한도를 추출하고 Simple Earn 상품과 매칭한다. |
+| 기존 Telegram 봇 `@Tturu_news_bot`을 사용할 수 있는가? | 사용할 수 있다. 기존 프로젝트처럼 Bot API `sendMessage`로 전송한다. | 새 프로젝트에는 독립 Telegram Notification Worker를 구현하고, 기존 봇의 token과 chat ID를 `.env`로 주입한다. |
+| 24시간 운영은 어떤 구조가 적절한가? | 개발은 로컬, 장시간 운영은 EC2/Lightsail 같은 서버에 앱을 띄우고 개인 컴퓨터에서 서버 대시보드에 접속한다. | 먼저 로컬 MVP를 완성하고 Docker 기반 실행 환경을 만든 뒤 EC2/Lightsail 배포와 접근 제한 방식을 설계한다. |
+| 서버 유지비는 어느 정도로 예상하는가? | 작은 Linux 서버 1대 기준 월 5달러에서 20달러 사이를 1차 예산으로 잡는다. | 비용 예측이 쉬운 Lightsail을 우선 후보로 두고, EC2는 세밀한 AWS 구성이 필요할 때 검토한다. |
+| AWS에서 환경설정을 줄이기 위해 Docker를 사용할 것인가? | Docker를 기본 배포 단위로 사용한다. | Dockerfile, docker-compose.yml, .dockerignore, .env.example을 기준으로 로컬과 서버 실행 환경을 통일한다. |

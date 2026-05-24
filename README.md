@@ -57,6 +57,12 @@ Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포�
 
 MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. Discord Webhook, Email, Browser Push는 후속 확장 후보입니다.
 
+기존 봇:
+
+- `@Tturu_news_bot`
+
+새 프로젝트에서는 기존 봇 프로그램에 직접 의존하지 않고, 같은 Bot API 방식으로 독립 Notification Worker를 구현합니다. `.env`에는 `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`를 설정합니다.
+
 ## 데이터 소스 후보
 
 - Binance Spot WebSocket Streams
@@ -124,6 +130,26 @@ MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. D
 - 로그에 API Key, Secret, 서명값을 남기지 않습니다.
 
 Secret Manager는 배포형 서비스나 팀 운영 단계에서 검토합니다. 로컬 개인용 MVP에서는 설정 부담이 적은 `.env` 방식을 기본으로 합니다.
+
+Telegram Bot Token은 비밀번호처럼 취급합니다. GitHub에 커밋하지 않고, 로그에도 남기지 않습니다.
+
+## 운영 방향
+
+초기에는 로컬 앱으로 개발하고 실행합니다.
+
+24시간 운영이 필요해지면 다음 순서로 확장합니다.
+
+1. 로컬 MVP 완성
+2. Telegram 알림 안정화
+3. Dockerfile 및 Docker Compose 추가
+4. 로컬 장시간 실행 테스트
+5. Amazon Lightsail, AWS EC2, 또는 작은 VPS에 배포
+
+24시간 운영 단계에서는 AWS EC2, Amazon Lightsail, 또는 작은 VPS에 앱을 띄우고, 개인 컴퓨터에서 서버의 대시보드에 접속하는 구조를 기본으로 합니다. 접근은 SSH 터널링, IP allowlist, Tailscale, Cloudflare Tunnel, 또는 로그인 인증으로 제한합니다.
+
+초기 서버 유지비는 작은 Linux 서버 1대 기준 월 5달러에서 20달러 사이를 1차 예산으로 봅니다. 비용 예측과 설정 단순성이 중요하면 Amazon Lightsail을 우선 검토하고, AWS 네트워크/IAM 구성을 세밀하게 다뤄야 하면 EC2를 검토합니다.
+
+AWS 서버에서 귀찮은 환경설정을 반복하지 않기 위해 Docker를 기본 배포 단위로 사용합니다. 서버에는 Docker와 Docker Compose만 준비하고, 앱은 `.env`와 compose 설정으로 실행하는 방향입니다.
 
 ## 리스크 고지
 
