@@ -91,6 +91,27 @@ MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. D
 
 자동 주문 실행은 MVP 범위에서 제외합니다. 먼저 데이터 수집, 분석, 알림 중심으로 안정적인 모니터링 도구를 만드는 것을 우선합니다.
 
+## 로컬 UI 실행
+
+현재 UI는 Vite + React + TypeScript 기반으로 구성되어 있습니다.
+
+```powershell
+npm install
+npm run dev
+```
+
+브라우저에서 접속:
+
+```text
+http://127.0.0.1:5173
+```
+
+프로덕션 빌드 확인:
+
+```powershell
+npm run build
+```
+
 ## 기술 스택 후보
 
 ### Frontend
