@@ -2,12 +2,12 @@
 
 Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simple Earn 상품, Futures 펀딩비, 스테이킹+숏 헤지 전략, arbitrage 가능성을 한 곳에서 모니터링하기 위한 개인용 대시보드 프로젝트입니다.
 
-현재 단계에서는 구현 전에 프로젝트 요구사항과 제품 방향을 정리하는 초기 기획 레포입니다.
+현재 단계에서는 구현 전에 프로젝트 요구사항과 제품 방향을 정리하는 초기 기획 레포입니다. MVP는 서버 배포형 서비스가 아니라 로컬 개인용 앱으로 시작하며, 사용자는 GitHub에서 프로젝트를 clone한 뒤 자신의 환경에서 실행하는 방식을 기본으로 합니다.
 
 ## 목표
 
 - BTC, ETH, SOL, BNB, TRX, XRP 등 주요 코인의 현재가를 실시간으로 확인합니다.
-- Binance Simple Earn 상품을 APR, 상품 유형, 구독 가능 여부, 이벤트 여부 기준으로 정리합니다.
+- Binance Simple Earn Flexible 상품을 APR, 구독 가능 여부, 이벤트 여부 기준으로 정리합니다.
 - Simple Earn 관련 Binance 공지를 함께 보여주어 이벤트성 APR을 빠르게 파악합니다.
 - 고APR Earn 상품에 대해 Futures 숏 포지션을 결합했을 때 예상 순수익과 리스크를 계산합니다.
 - Spot, Futures, 여러 페어 간 arbitrage 후보를 감지하고 알림을 받을 수 있게 합니다.
@@ -20,7 +20,7 @@ Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simp
 
 ### Simple Earn Screener
 
-Simple Earn Flexible 및 Locked 상품을 APR, 한도, 구독 가능 여부, 관련 이벤트 기준으로 필터링하고 정렬하는 화면입니다.
+Simple Earn Flexible 상품을 APR, 한도, 구독 가능 여부, 관련 이벤트 기준으로 필터링하고 정렬하는 화면입니다. Locked 상품은 후속 확장 대상으로 둡니다.
 
 ### Earn Events
 
@@ -29,6 +29,8 @@ Binance Simple Earn 공지 페이지의 이벤트를 수집하고, 관련 코인
 대상 공지:
 
 - https://www.binance.com/en/support/announcement/list/93
+
+MVP에서는 공지 페이지를 30분 간격으로 크롤링하고, 신규 공지가 발견되면 Telegram으로 알림을 보냅니다. 공지 상세에서는 특정 토큰의 APR, 이벤트 기간, 참여 조건, 한도 등을 자동 파싱해 Simple Earn Flexible 상품과 매칭합니다.
 
 ### Hedge Strategy Lab
 
@@ -52,9 +54,8 @@ Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포�
 초기 알림 채널 후보:
 
 - Telegram
-- Discord Webhook
-- Email
-- Browser Push
+
+MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. Discord Webhook, Email, Browser Push는 후속 확장 후보입니다.
 
 ## 데이터 소스 후보
 
@@ -65,17 +66,22 @@ Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포�
 - Binance Simple Earn SAPI
 - Binance Support Announcement
 
+공지 데이터는 WebSocket이 아니라 주기적 크롤링으로 수집합니다. APR 변동에 빠르게 대응하기 위해 Simple Earn Flexible 상품 데이터는 공지보다 짧은 주기로 갱신하고, 화면에서는 수동 새로고침을 제공합니다.
+
 ## MVP 범위
 
 초기 MVP는 다음 기능을 목표로 합니다.
 
 - 주요 코인 실시간 가격 대시보드
-- Simple Earn 상품 스크리너
+- Simple Earn Flexible 상품 스크리너
 - Simple Earn 공지 연동
 - 고APR 상품의 Futures 마켓 존재 여부 확인
 - 펀딩비 기반 예상 순 APR 계산
 - Spot-Futures 베이시스 모니터링
-- Telegram 또는 Discord Webhook 알림
+- Binance 내부 페어 중심 arbitrage 모니터링
+- 실제 계정 잔고 조회 연동
+- Telegram Bot 알림
+- 한국어 UI
 
 자동 주문 실행은 MVP 범위에서 제외합니다. 먼저 데이터 수집, 분석, 알림 중심으로 안정적인 모니터링 도구를 만드는 것을 우선합니다.
 
@@ -102,13 +108,22 @@ Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포�
 - PostgreSQL for deployed version
 - Redis for real-time cache and notification cooldown
 
+### UI
+
+- 한국어 단일 UI
+- 다국어 지원은 후속 확장
+
 ## 보안 원칙
 
-- API Key는 `.env` 또는 Secret Manager에 저장합니다.
+- API Key, API Secret, Telegram Bot Token, Telegram Chat ID는 로컬 `.env`에 저장합니다.
+- `.env`는 git에 커밋하지 않습니다.
 - API Secret은 클라이언트에 노출하지 않습니다.
 - 초기 버전에서는 읽기 전용 API Key만 사용합니다.
 - 출금 권한과 거래 권한은 기본적으로 비활성화합니다.
+- 실제 계정 잔고 조회는 허용하되 주문 실행 권한은 사용하지 않습니다.
 - 로그에 API Key, Secret, 서명값을 남기지 않습니다.
+
+Secret Manager는 배포형 서비스나 팀 운영 단계에서 검토합니다. 로컬 개인용 MVP에서는 설정 부담이 적은 `.env` 방식을 기본으로 합니다.
 
 ## 리스크 고지
 
