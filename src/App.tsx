@@ -17,6 +17,7 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type Coin = {
@@ -48,6 +49,8 @@ type Alert = {
   level: "info" | "warning" | "success";
 };
 
+type Page = "overview" | "markets" | "earn" | "hedge" | "arbitrage";
+
 const coins: Coin[] = [
   { symbol: "BTC", name: "Bitcoin", price: "68,420.12", change: 1.82, volume: "$24.8B", high: "69,110.00", low: "66,902.45", spread: "0.01%" },
   { symbol: "ETH", name: "Ethereum", price: "3,742.84", change: -0.46, volume: "$12.1B", high: "3,811.12", low: "3,690.20", spread: "0.02%" },
@@ -76,7 +79,44 @@ const arbitrageRows = [
   { path: "USDT → BTC → ETH → USDT", profit: "0.07%", size: "$12,000", status: "수수료 미달" },
 ];
 
+const pagePaths: Record<Page, string> = {
+  overview: "/",
+  markets: "/markets",
+  earn: "/earn",
+  hedge: "/hedge",
+  arbitrage: "/arbitrage",
+};
+
+const pageFromPath = (path: string): Page => {
+  const found = (Object.entries(pagePaths) as Array<[Page, string]>).find(([, value]) => value === path);
+  return found?.[0] ?? "overview";
+};
+
 export function App() {
+  const [activePage, setActivePage] = useState<Page>(() => pageFromPath(window.location.pathname));
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const pageTitle = useMemo(() => {
+    const labels: Record<Page, string> = {
+      overview: "Overview",
+      markets: "Market Watch",
+      earn: "Earn Screener",
+      hedge: "Hedge Lab",
+      arbitrage: "Arbitrage Monitor",
+    };
+    return labels[activePage];
+  }, [activePage]);
+
+  useEffect(() => {
+    const handlePopState = () => setActivePage(pageFromPath(window.location.pathname));
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const navigate = (page: Page) => {
+    setActivePage(page);
+    window.history.pushState({}, "", pagePaths[page]);
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -86,24 +126,23 @@ export function App() {
           </div>
           <div>
             <strong>Binance Monitor</strong>
-            <small>Local MVP</small>
+            <small>Strategy Desk</small>
           </div>
         </div>
 
         <nav className="nav">
-          <a className="nav-item active" href="#overview"><Gauge size={18} />개요</a>
-          <a className="nav-item" href="#markets"><CandlestickChart size={18} />마켓</a>
-          <a className="nav-item" href="#earn"><CircleDollarSign size={18} />Simple Earn</a>
-          <a className="nav-item" href="#hedge"><ShieldCheck size={18} />헤지 전략</a>
-          <a className="nav-item" href="#arbitrage"><Zap size={18} />Arbitrage</a>
-          <a className="nav-item" href="#alerts"><Bell size={18} />알림</a>
+          <NavButton active={activePage === "overview"} icon={<Gauge size={18} />} label="개요" onClick={() => navigate("overview")} />
+          <NavButton active={activePage === "markets"} icon={<CandlestickChart size={18} />} label="마켓" onClick={() => navigate("markets")} />
+          <NavButton active={activePage === "earn"} icon={<CircleDollarSign size={18} />} label="Simple Earn" onClick={() => navigate("earn")} />
+          <NavButton active={activePage === "hedge"} icon={<ShieldCheck size={18} />} label="헤지 전략" onClick={() => navigate("hedge")} />
+          <NavButton active={activePage === "arbitrage"} icon={<Zap size={18} />} label="Arbitrage" onClick={() => navigate("arbitrage")} />
         </nav>
 
         <div className="sidebar-status">
           <span className="status-dot" />
           <div>
-            <strong>Collector 정상</strong>
-            <small>가격 1초, Earn 3분, 공지 30분</small>
+            <strong>시스템 정상</strong>
+            <small>시장, 수익률, 알림 상태 양호</small>
           </div>
         </div>
       </aside>
@@ -115,17 +154,47 @@ export function App() {
             <input placeholder="코인, 페어, 공지 검색" />
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" title="새로고침"><RefreshCcw size={18} /></button>
+            <span className="page-chip">{pageTitle}</span>
+            <button className="icon-button" title="새로고침" type="button"><RefreshCcw size={18} /></button>
+            <div className="alert-popover-wrap">
+              <button className={`icon-button alert-trigger ${isAlertOpen ? "active" : ""}`} title="알림 기록" type="button" onClick={() => setIsAlertOpen((value) => !value)}>
+                <Bell size={18} />
+                <span>{alerts.length}</span>
+              </button>
+              {isAlertOpen && <AlertPopover onClose={() => setIsAlertOpen(false)} />}
+            </div>
             <button className="pill-button"><Bot size={17} />@Tturu_news_bot</button>
             <button className="pill-button muted"><Server size={17} />Local</button>
           </div>
         </header>
 
-        <section className="hero-band" id="overview">
+        {activePage === "overview" && <OverviewPage />}
+        {activePage === "markets" && <MarketsPage />}
+        {activePage === "earn" && <EarnPage />}
+        {activePage === "hedge" && <HedgePage />}
+        {activePage === "arbitrage" && <ArbitragePage />}
+      </section>
+    </main>
+  );
+}
+
+function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button className={`nav-item ${active ? "active" : ""}`} type="button" onClick={onClick}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function OverviewPage() {
+  return (
+    <>
+      <section className="hero-band">
           <div className="hero-copy">
             <span className="eyebrow">실시간 모니터링</span>
             <h1>Earn APR, Funding Fee, Arbitrage를 한 화면에서 추적</h1>
-            <p>Simple Earn Flexible과 Futures 데이터를 결합해 스테이킹+숏 후보를 빠르게 찾고 Telegram으로 알림을 보냅니다.</p>
+            <p>고수익 Earn 기회와 헤지 비용을 함께 비교하고, 실행 가능한 시그널만 빠르게 확인합니다.</p>
           </div>
           <div className="hero-stats">
             <Metric label="감시 코인" value="38" trend="+6" />
@@ -135,16 +204,29 @@ export function App() {
         </section>
 
         <section className="grid metrics-grid">
-          <MetricCard icon={<Activity size={19} />} label="Spot WebSocket" value="Live" detail="최근 업데이트 0.8초 전" tone="green" />
-          <MetricCard icon={<Database size={19} />} label="Simple Earn" value="3분 주기" detail="Flexible 상품 우선" tone="yellow" />
-          <MetricCard icon={<Wallet size={19} />} label="계정 잔고" value="Read-only" detail="주문/출금 권한 제외" tone="blue" />
-          <MetricCard icon={<Bell size={19} />} label="Telegram" value="Ready" detail="@Tturu_news_bot 연결 예정" tone="green" />
+          <MetricCard icon={<Activity size={19} />} label="Market Stream" value="Live" detail="주요 코인 가격 갱신 중" tone="green" />
+          <MetricCard icon={<Database size={19} />} label="Earn Screener" value="High APR" detail="이벤트 수익률 후보 추적" tone="yellow" />
+          <MetricCard icon={<Wallet size={19} />} label="Portfolio" value="연동 대기" detail="잔고 기반 수익률 계산 준비" tone="blue" />
+          <MetricCard icon={<Bell size={19} />} label="Alerts" value="Ready" detail="중요 시그널 즉시 전송" tone="green" />
         </section>
 
         <section className="content-grid">
-          <section className="panel market-panel" id="markets">
+          <MarketPanel compact />
+          <AlertSummaryPanel />
+        </section>
+    </>
+  );
+}
+
+function MarketsPage() {
+  return <MarketPanel />;
+}
+
+function MarketPanel({ compact = false }: { compact?: boolean }) {
+  return (
+    <section className="panel market-panel">
             <PanelHeader title="Market Watch" subtitle="메이저 코인 실시간 가격" action="USDT 기준" />
-            <div className="coin-grid">
+            <div className={`coin-grid ${compact ? "" : "wide"}`}>
               {coins.map((coin) => (
                 <article className="coin-tile" key={coin.symbol}>
                   <div className="coin-head">
@@ -167,8 +249,12 @@ export function App() {
               ))}
             </div>
           </section>
+  );
+}
 
-          <section className="panel alert-panel" id="alerts">
+function AlertSummaryPanel() {
+  return (
+    <section className="panel alert-panel">
             <PanelHeader title="Telegram Alerts" subtitle="실시간 감시 알림" action="3 active" />
             <div className="alert-list">
               {alerts.map((alert) => (
@@ -182,10 +268,38 @@ export function App() {
               ))}
             </div>
           </section>
-        </section>
+  );
+}
 
-        <section className="panel" id="earn">
-          <PanelHeader title="Simple Earn Flexible Screener" subtitle="공지 이벤트와 Futures 헤지 가능 여부를 함께 표시" action="APR 높은 순" />
+function AlertPopover({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="alert-popover" role="dialog" aria-label="알림 기록">
+      <div className="popover-header">
+        <div>
+          <strong>알림 기록</strong>
+          <small>최근 시그널과 공지</small>
+        </div>
+        <button type="button" onClick={onClose}>닫기</button>
+      </div>
+      <div className="popover-list">
+        {alerts.map((alert) => (
+          <article className={`popover-alert ${alert.level}`} key={alert.title}>
+            <div>
+              <strong>{alert.title}</strong>
+              <p>{alert.body}</p>
+            </div>
+            <time>{alert.time}</time>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EarnPage() {
+  return (
+    <section className="panel page-panel">
+          <PanelHeader title="Earn Opportunity Screener" subtitle="APR, 이벤트 조건, 헤지 비용을 함께 비교" action="APR 높은 순" />
           <div className="toolbar">
             <button className="filter active">Flexible</button>
             <button className="filter">Futures 있음</button>
@@ -224,10 +338,13 @@ export function App() {
             </table>
           </div>
         </section>
+  );
+}
 
-        <section className="bottom-grid">
-          <section className="panel" id="hedge">
-            <PanelHeader title="Hedge Strategy Lab" subtitle="Earn + Futures 숏 예상 수익" action="Read-only" />
+function HedgePage() {
+  return (
+    <section className="panel page-panel">
+            <PanelHeader title="Hedge Strategy Lab" subtitle="Earn 수익과 숏 포지션 비용 비교" action="시뮬레이션" />
             <div className="strategy-card">
               <div className="strategy-main">
                 <span className="coin-icon large">T</span>
@@ -247,8 +364,12 @@ export function App() {
               <RiskBar label="이벤트 종료 위험" value={72} />
             </div>
           </section>
+  );
+}
 
-          <section className="panel" id="arbitrage">
+function ArbitragePage() {
+  return (
+    <section className="panel page-panel">
             <PanelHeader title="Arbitrage Monitor" subtitle="Binance 내부 페어 우선" action="쿨다운 적용" />
             <div className="signal-list">
               {arbitrageRows.map((row) => (
@@ -264,9 +385,6 @@ export function App() {
               ))}
             </div>
           </section>
-        </section>
-      </section>
-    </main>
   );
 }
 
