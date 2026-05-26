@@ -31,7 +31,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
       <div className="sidebar-status">
         <span className="status-dot" />
         <div>
-          <strong>시스템 정상</strong>
+          <strong>시스템 정상<br/></strong>
           <small>시장, 수익률, 알림 상태 양호</small>
         </div>
       </div>

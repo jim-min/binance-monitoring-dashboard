@@ -1,11 +1,17 @@
-import { coins } from "../data/mock";
+import { useMarketPrices } from "../hooks/useMarketPrices";
 import { MiniChart } from "./MiniChart";
 import { PanelHeader } from "./PanelHeader";
 
 export function MarketPanel({ compact = false }: { compact?: boolean }) {
+  const { coins, lastUpdatedAt, status, statusLabel } = useMarketPrices();
+
   return (
     <section className="panel market-panel">
-      <PanelHeader title="Market Watch" subtitle="메이저 코인 실시간 가격" action="USDT 기준" />
+      <PanelHeader title="Market Watch" subtitle={`메이저 코인 실시간 가격 · ${lastUpdatedAt}`} action={statusLabel} />
+      <div className={`market-status ${status}`}>
+        <span />
+        Binance Spot WebSocket
+      </div>
       <div className={`coin-grid ${compact ? "" : "wide"}`}>
         {coins.map((coin) => (
           <article className="coin-tile" key={coin.symbol}>
@@ -25,6 +31,7 @@ export function MarketPanel({ compact = false }: { compact?: boolean }) {
               <span>Vol {coin.volume}</span>
               <span>Spread {coin.spread}</span>
             </div>
+            {coin.updatedAt && <div className="coin-updated">Updated {coin.updatedAt}</div>}
           </article>
         ))}
       </div>
