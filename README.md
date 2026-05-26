@@ -106,6 +106,28 @@ npm run dev
 http://127.0.0.1:5173
 ```
 
+로컬 API 서버 실행:
+
+```powershell
+npm run server:dev
+```
+
+API 상태 확인:
+
+```text
+http://127.0.0.1:8787/api/health
+http://127.0.0.1:8787/api/config/status
+```
+
+Telegram 테스트 전송:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:8787/api/telegram/test" `
+  -ContentType "application/json" `
+  -Body '{"message":"Binance Monitoring Dashboard test"}'
+```
+
 프로덕션 빌드 확인:
 
 ```powershell
