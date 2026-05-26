@@ -9,7 +9,10 @@ export type Coin = {
   high: string;
   low: string;
   spread: string;
+  updatedAt?: string;
 };
+
+export type MarketConnectionStatus = "connecting" | "live" | "reconnecting" | "offline";
 
 export type EarnProduct = {
   symbol: string;

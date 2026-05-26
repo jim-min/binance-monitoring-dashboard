@@ -518,6 +518,40 @@ button {
   gap: 12px;
 }
 
+.market-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  margin: -4px 0 12px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.market-status span {
+  width: 8px;
+  height: 8px;
+  background: var(--yellow);
+  border-radius: 999px;
+}
+
+.market-status.live span {
+  background: var(--green);
+}
+
+.market-status.reconnecting span,
+.market-status.connecting span {
+  background: var(--yellow);
+}
+
+.market-status.offline span {
+  background: var(--red);
+}
+
 .coin-tile {
   min-height: 176px;
   padding: 14px;
@@ -579,6 +613,12 @@ button {
   justify-content: space-between;
   gap: 10px;
   font-size: 12px;
+}
+
+.coin-updated {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .alert-list,
