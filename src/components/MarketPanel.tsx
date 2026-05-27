@@ -1,10 +1,17 @@
-import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMarketPrices } from "../hooks/useMarketPrices";
 import { MiniChart } from "./MiniChart";
 import { PanelHeader } from "./PanelHeader";
+import { SortMenu } from "./SortMenu";
 
 type MarketSortKey = "symbol" | "change" | "price" | "volume";
+
+const marketSortOptions: { value: MarketSortKey; label: string }[] = [
+  { value: "change", label: "등락률 높은 순" },
+  { value: "volume", label: "거래대금 높은 순" },
+  { value: "price", label: "가격 높은 순" },
+  { value: "symbol", label: "심볼명" },
+];
 
 const numeric = (value: string) => Number(value.replace(/[$,%]/g, "").replace(/,/g, ""));
 const compactNumeric = (value: string) => {
@@ -37,16 +44,7 @@ export function MarketPanel({ compact = false }: { compact?: boolean }) {
           <span />
           Binance Spot WebSocket
         </div>
-        <label className="sort-control">
-          <span>정렬</span>
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value as MarketSortKey)}>
-            <option value="change">등락률 높은 순</option>
-            <option value="volume">거래대금 높은 순</option>
-            <option value="price">가격 높은 순</option>
-            <option value="symbol">심볼명</option>
-          </select>
-          <ChevronDown size={16} />
-        </label>
+        <SortMenu value={sortKey} options={marketSortOptions} onChange={setSortKey} />
       </div>
       <div className={`coin-grid ${compact ? "" : "wide"}`}>
         {sortedCoins.map((coin) => (

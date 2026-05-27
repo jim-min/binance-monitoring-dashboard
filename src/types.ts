@@ -128,3 +128,15 @@ export type StrategyBacktest = {
   };
   series: StrategyBacktestPoint[];
 };
+
+export type HedgeCandidate = {
+  asset: string;
+  symbol: string;
+  quoteAsset: string;
+  marginAsset: string;
+  productCount: number;
+  maxApr: number;
+  hasFlexible: boolean;
+  hasLocked: boolean;
+  canPurchase: boolean;
+};

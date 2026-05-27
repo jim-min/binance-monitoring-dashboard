@@ -1,10 +1,19 @@
-import { Activity, ArrowRightLeft, ChevronDown, LineChart, Radio, TriangleAlert } from "lucide-react";
+import { Activity, ArrowRightLeft, LineChart, Radio, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PanelHeader } from "../components/PanelHeader";
+import { SortMenu } from "../components/SortMenu";
 import { useArbitrageMonitor } from "../hooks/useArbitrageMonitor";
 import type { ArbitrageOpportunity, MarketConnectionStatus } from "../types";
 
 type ArbitrageSortKey = "netPct" | "grossPct" | "estimatedSize" | "type" | "status";
+
+const arbitrageSortOptions: { value: ArbitrageSortKey; label: string }[] = [
+  { value: "netPct", label: "Net 높은 순" },
+  { value: "grossPct", label: "Gross 높은 순" },
+  { value: "estimatedSize", label: "가능 규모 높은 순" },
+  { value: "type", label: "유형" },
+  { value: "status", label: "상태" },
+];
 
 export function ArbitragePage() {
   const { opportunities, liveCount, actionableCount, lastUpdatedAt, spotStatus, futuresStatus } = useArbitrageMonitor();
@@ -47,17 +56,7 @@ export function ArbitragePage() {
       <div className="toolbar">
         <button className="filter active" type="button">실시간 호가</button>
         <button className="filter" type="button">수수료 반영</button>
-        <label className="sort-control right">
-          <span>정렬</span>
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value as ArbitrageSortKey)}>
-            <option value="netPct">Net 높은 순</option>
-            <option value="grossPct">Gross 높은 순</option>
-            <option value="estimatedSize">가능 규모 높은 순</option>
-            <option value="type">유형</option>
-            <option value="status">상태</option>
-          </select>
-          <ChevronDown size={16} />
-        </label>
+        <SortMenu className="right" value={sortKey} options={arbitrageSortOptions} onChange={setSortKey} />
       </div>
 
       <div className="arb-table-wrap">

@@ -1,6 +1,7 @@
-import { ChevronDown, RefreshCcw, Star } from "lucide-react";
+import { RefreshCcw, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PanelHeader } from "../components/PanelHeader";
+import { SortMenu } from "../components/SortMenu";
 import { useSimpleEarnProducts } from "../hooks/useSimpleEarnProducts";
 import type { SimpleEarnProduct } from "../types";
 
@@ -8,6 +9,13 @@ type EarnSortKey = "apr" | "asset" | "minPurchaseAmount" | "status";
 type EarnTypeFilter = "ALL" | "FLEXIBLE" | "LOCKED";
 
 const formatApr = (apr: number) => `${(apr * 100).toFixed(apr >= 0.1 ? 2 : 3)}%`;
+
+const earnSortOptions: { value: EarnSortKey; label: string }[] = [
+  { value: "apr", label: "APR 높은 순" },
+  { value: "asset", label: "자산명" },
+  { value: "minPurchaseAmount", label: "최소 구독 수량" },
+  { value: "status", label: "상태" },
+];
 
 const statusText = (product: SimpleEarnProduct) => {
   if (product.isSoldOut) {
@@ -96,16 +104,7 @@ export function EarnPage() {
         <button className={`filter ${onlyHot ? "active" : ""}`} type="button" onClick={() => setOnlyHot((value) => !value)}>Hot</button>
         <button className={`filter ${onlyPurchasable ? "active" : ""}`} type="button" onClick={() => setOnlyPurchasable((value) => !value)}>구독 가능</button>
         <button className="filter" type="button"><RefreshCcw size={15} />3분 자동 갱신</button>
-        <label className="sort-control right">
-          <span>정렬</span>
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value as EarnSortKey)}>
-            <option value="apr">APR 높은 순</option>
-            <option value="asset">자산명</option>
-            <option value="minPurchaseAmount">최소 구독 수량</option>
-            <option value="status">상태</option>
-          </select>
-          <ChevronDown size={16} />
-        </label>
+        <SortMenu className="right" value={sortKey} options={earnSortOptions} onChange={setSortKey} />
       </div>
       <div className="table-wrap">
         <table>

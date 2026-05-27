@@ -1,12 +1,12 @@
 import { Activity, BarChart3, Calculator, RefreshCcw, Shield, TrendingDown, Wallet } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PanelHeader } from "../components/PanelHeader";
 import { RiskBar } from "../components/RiskBar";
+import { SearchableSelect } from "../components/SearchableSelect";
+import { useHedgeCandidates } from "../hooks/useHedgeCandidates";
 import { useStrategyBacktest } from "../hooks/useStrategyBacktest";
 import type { StrategyBacktest, StrategyResult } from "../types";
-
-const SYMBOLS = ["TRXUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT"];
 
 const formatUsd = (value: number) => new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -132,6 +132,18 @@ export function HedgePage() {
   const [spotFeeBps, setSpotFeeBps] = useState(10);
   const [futuresFeeBps, setFuturesFeeBps] = useState(5);
   const [slippageBps, setSlippageBps] = useState(2);
+  const { candidates, isLoading: isUniverseLoading, error: universeError, lastUpdatedAt: universeUpdatedAt } = useHedgeCandidates();
+  const selectedCandidate = useMemo(
+    () => candidates.find((candidate) => candidate.symbol === symbol),
+    [candidates, symbol],
+  );
+  const symbolOptions = useMemo(() => candidates.map((candidate) => ({
+    value: candidate.symbol,
+    label: `${candidate.asset} / ${candidate.quoteAsset}`,
+    description: `${candidate.symbol} · APR ${(candidate.maxApr * 100).toFixed(candidate.maxApr >= 0.1 ? 2 : 3)}% · ${candidate.productCount}개 Earn 상품`,
+    meta: candidate.canPurchase ? "구독 가능" : "구독 제한",
+    searchText: `${candidate.asset} ${candidate.symbol}`,
+  })), [candidates]);
   const { data, isLoading, error } = useStrategyBacktest({
     symbol,
     principal,
@@ -142,6 +154,22 @@ export function HedgePage() {
     futuresFeeBps,
     slippageBps,
   });
+
+  useEffect(() => {
+    if (candidates.length > 0 && !candidates.some((candidate) => candidate.symbol === symbol)) {
+      const firstPurchasable = candidates.find((candidate) => candidate.canPurchase) ?? candidates[0];
+      setSymbol(firstPurchasable.symbol);
+      setEarnAprPct(Number((firstPurchasable.maxApr * 100).toFixed(3)));
+    }
+  }, [candidates, symbol]);
+
+  const selectSymbol = (nextSymbol: string) => {
+    const nextCandidate = candidates.find((candidate) => candidate.symbol === nextSymbol);
+    setSymbol(nextSymbol);
+    if (nextCandidate) {
+      setEarnAprPct(Number((nextCandidate.maxApr * 100).toFixed(3)));
+    }
+  };
 
   const risk = useMemo(() => {
     const fundingRisk = Math.min(Math.abs(data?.funding.annualizedFundingPct ?? 0) * 100, 100);
@@ -157,7 +185,7 @@ export function HedgePage() {
 
   return (
     <section className="panel page-panel">
-      <PanelHeader title="Hedge Strategy Lab" subtitle="Earn APR, 숏 펀딩비, 거래 비용을 같은 기준으로 비교" action={isLoading ? "계산 중" : "백테스트"} />
+      <PanelHeader title="Hedge Strategy Lab" subtitle={`Simple Earn + Futures 가능 후보 ${candidates.length}개 · ${universeUpdatedAt}`} action={isLoading || isUniverseLoading ? "계산 중" : "백테스트"} />
 
       <div className="strategy-lab-grid">
         <aside className="strategy-controls">
@@ -166,14 +194,28 @@ export function HedgePage() {
             <strong>전략 입력값</strong>
           </div>
 
-          <label className="strategy-field">
+          <div className="strategy-field">
             <span>대상 페어</span>
-            <select value={symbol} onChange={(event) => setSymbol(event.target.value)}>
-              {SYMBOLS.map((item) => (
-                <option value={item} key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
+            <SearchableSelect
+              label="페어"
+              value={symbol}
+              options={symbolOptions}
+              placeholder="코인명 또는 심볼 검색"
+              emptyText="Earn과 Futures가 모두 있는 코인이 없습니다"
+              onChange={selectSymbol}
+            />
+          </div>
+
+          {selectedCandidate ? (
+            <div className="strategy-universe-card">
+              <strong>{selectedCandidate.asset} Earn 후보</strong>
+              <span>최고 APR {(selectedCandidate.maxApr * 100).toFixed(selectedCandidate.maxApr >= 0.1 ? 2 : 3)}% · 상품 {selectedCandidate.productCount}개 · {selectedCandidate.hasFlexible ? "Flexible" : ""}{selectedCandidate.hasFlexible && selectedCandidate.hasLocked ? " + " : ""}{selectedCandidate.hasLocked ? "Locked" : ""}</span>
+            </div>
+          ) : null}
+
+          {universeError ? (
+            <div className="inline-warning compact">후보 목록 API 연결 실패: {universeError}. 임시 후보를 표시합니다.</div>
+          ) : null}
 
           <NumericField label="투입 자금" value={principal} min={100} step={100} suffix="USDT" onChange={setPrincipal} />
           <NumericField label="백테스트 기간" value={days} min={1} max={180} step={1} suffix="일" onChange={setDays} />

@@ -1,5 +1,10 @@
 import { createServer } from "node:http";
-import { fetchAllSimpleEarnProducts, fetchFlexibleEarnProducts, fetchLockedEarnProducts } from "./binance.mjs";
+import {
+  fetchAllSimpleEarnProducts,
+  fetchEarnFuturesUniverse,
+  fetchFlexibleEarnProducts,
+  fetchLockedEarnProducts,
+} from "./binance.mjs";
 import { configStatus, env } from "./env.mjs";
 import { runStrategyBacktest } from "./strategy.mjs";
 import { sendTelegramMessage } from "./telegram.mjs";
@@ -89,6 +94,14 @@ const server = createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Strategy backtest failed",
       });
     }
+  }
+
+  if (method === "GET" && url.pathname === "/api/strategy/eligible-symbols") {
+    const result = await fetchEarnFuturesUniverse();
+    return json(response, result.status, {
+      ok: result.ok,
+      ...result.data,
+    });
   }
 
   if (method === "POST" && url.pathname === "/api/telegram/test") {
