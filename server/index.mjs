@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { fetchAllSimpleEarnProducts, fetchFlexibleEarnProducts, fetchLockedEarnProducts } from "./binance.mjs";
 import { configStatus, env } from "./env.mjs";
+import { runStrategyBacktest } from "./strategy.mjs";
 import { sendTelegramMessage } from "./telegram.mjs";
 
 const json = (response, statusCode, payload) => {
@@ -76,6 +77,18 @@ const server = createServer(async (request, response) => {
       ok: result.ok,
       ...result.data,
     });
+  }
+
+  if (method === "GET" && url.pathname === "/api/strategy/backtest") {
+    try {
+      const result = await runStrategyBacktest(Object.fromEntries(url.searchParams));
+      return json(response, 200, result);
+    } catch (error) {
+      return json(response, 502, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Strategy backtest failed",
+      });
+    }
   }
 
   if (method === "POST" && url.pathname === "/api/telegram/test") {
