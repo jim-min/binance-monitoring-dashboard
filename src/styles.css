@@ -813,6 +813,141 @@ progress::-webkit-progress-value {
   font-style: normal;
 }
 
+.arb-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.arb-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.arb-summary-card small {
+  color: var(--muted);
+}
+
+.arb-summary-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.arb-summary-card.live .metric-icon {
+  color: var(--green);
+}
+
+.arb-summary-card.connecting .metric-icon,
+.arb-summary-card.reconnecting .metric-icon {
+  color: var(--yellow);
+}
+
+.arb-summary-card.offline .metric-icon {
+  color: var(--red);
+}
+
+.arb-note {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  color: var(--soft);
+  background: rgba(240, 185, 11, 0.06);
+  border: 1px solid rgba(240, 185, 11, 0.16);
+  border-radius: var(--radius);
+}
+
+.arb-note strong {
+  flex: 0 0 auto;
+  color: var(--yellow-2);
+}
+
+.arb-note span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.arb-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.arb-table {
+  min-width: 1060px;
+}
+
+.arb-path {
+  color: var(--text);
+}
+
+.arb-type,
+.arb-status,
+.arb-legs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.arb-type {
+  color: var(--yellow-2);
+}
+
+.arb-type.basis {
+  color: var(--blue);
+}
+
+.arb-legs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.arb-legs span {
+  padding: 4px 7px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.arb-status {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.arb-status.ready {
+  color: #0b0e11;
+  background: var(--yellow);
+}
+
+.arb-status.watching {
+  color: var(--green);
+  background: rgba(14, 203, 129, 0.1);
+}
+
+.arb-status.costly {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.arb-status.waiting {
+  color: var(--yellow-2);
+  background: rgba(240, 185, 11, 0.08);
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -870,6 +1005,7 @@ progress::-webkit-progress-value {
 
   .hero-stats,
   .coin-grid,
+  .arb-summary-grid,
   .nav {
     grid-template-columns: 1fr;
   }

@@ -38,3 +38,15 @@ export type ArbitrageSignal = {
   size: string;
   status: string;
 };
+
+export type ArbitrageOpportunity = {
+  id: string;
+  type: "triangular" | "basis";
+  path: string;
+  legs: string[];
+  grossPct: number;
+  netPct: number;
+  estimatedSize: string;
+  status: "ready" | "watching" | "costly" | "waiting";
+  updatedAt: string;
+};
