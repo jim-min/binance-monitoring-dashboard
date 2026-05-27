@@ -25,6 +25,22 @@ export type EarnProduct = {
   netApr: string;
 };
 
+export type SimpleEarnProduct = {
+  productType: "FLEXIBLE" | "LOCKED";
+  asset: string;
+  productId: string;
+  apr: number;
+  tierApr: string;
+  canPurchase: boolean;
+  canRedeem: boolean;
+  isSoldOut: boolean;
+  hot: boolean;
+  minPurchaseAmount: string;
+  status: string;
+  duration: string;
+  rewardAsset: string;
+};
+
 export type Alert = {
   title: string;
   body: string;

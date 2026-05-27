@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { fetchAllSimpleEarnProducts, fetchFlexibleEarnProducts, fetchLockedEarnProducts } from "./binance.mjs";
 import { configStatus, env } from "./env.mjs";
 import { sendTelegramMessage } from "./telegram.mjs";
 
@@ -50,6 +51,30 @@ const server = createServer(async (request, response) => {
     return json(response, 200, {
       ok: true,
       config: configStatus(),
+    });
+  }
+
+  if (method === "GET" && url.pathname === "/api/simple-earn/flexible") {
+    const result = await fetchFlexibleEarnProducts();
+    return json(response, result.status, {
+      ok: result.ok,
+      ...result.data,
+    });
+  }
+
+  if (method === "GET" && url.pathname === "/api/simple-earn/locked") {
+    const result = await fetchLockedEarnProducts();
+    return json(response, result.status, {
+      ok: result.ok,
+      ...result.data,
+    });
+  }
+
+  if (method === "GET" && url.pathname === "/api/simple-earn/products") {
+    const result = await fetchAllSimpleEarnProducts();
+    return json(response, result.status, {
+      ok: result.ok,
+      ...result.data,
     });
   }
 

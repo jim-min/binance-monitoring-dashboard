@@ -1,10 +1,32 @@
-import { Activity, ArrowRightLeft, LineChart, Radio, TriangleAlert } from "lucide-react";
+import { Activity, ArrowRightLeft, ChevronDown, LineChart, Radio, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 import { PanelHeader } from "../components/PanelHeader";
 import { useArbitrageMonitor } from "../hooks/useArbitrageMonitor";
 import type { ArbitrageOpportunity, MarketConnectionStatus } from "../types";
 
+type ArbitrageSortKey = "netPct" | "grossPct" | "estimatedSize" | "type" | "status";
+
 export function ArbitragePage() {
   const { opportunities, liveCount, actionableCount, lastUpdatedAt, spotStatus, futuresStatus } = useArbitrageMonitor();
+  const [sortKey, setSortKey] = useState<ArbitrageSortKey>("netPct");
+  const sortedOpportunities = useMemo(() => [...opportunities].sort((a, b) => {
+    if (a.status === "waiting" && b.status !== "waiting") {
+      return 1;
+    }
+    if (a.status !== "waiting" && b.status === "waiting") {
+      return -1;
+    }
+    if (sortKey === "grossPct") {
+      return b.grossPct - a.grossPct;
+    }
+    if (sortKey === "estimatedSize") {
+      return parseSize(b.estimatedSize) - parseSize(a.estimatedSize);
+    }
+    if (sortKey === "type" || sortKey === "status") {
+      return String(a[sortKey]).localeCompare(String(b[sortKey]));
+    }
+    return b.netPct - a.netPct;
+  }), [opportunities, sortKey]);
 
   return (
     <section className="panel page-panel">
@@ -22,6 +44,22 @@ export function ArbitragePage() {
         <span>Spot 삼각 차익은 bid/ask와 3회 거래 비용을 반영하고, Spot-Futures 베이시스는 현물 매수 + Perp 숏 기준으로 계산합니다. 가능 규모는 현재 최우선 호가 수량 기준의 보수적 추정치입니다.</span>
       </div>
 
+      <div className="toolbar">
+        <button className="filter active" type="button">실시간 호가</button>
+        <button className="filter" type="button">수수료 반영</button>
+        <label className="sort-control right">
+          <span>정렬</span>
+          <select value={sortKey} onChange={(event) => setSortKey(event.target.value as ArbitrageSortKey)}>
+            <option value="netPct">Net 높은 순</option>
+            <option value="grossPct">Gross 높은 순</option>
+            <option value="estimatedSize">가능 규모 높은 순</option>
+            <option value="type">유형</option>
+            <option value="status">상태</option>
+          </select>
+          <ChevronDown size={16} />
+        </label>
+      </div>
+
       <div className="arb-table-wrap">
         <table className="arb-table">
           <thead>
@@ -37,7 +75,7 @@ export function ArbitragePage() {
             </tr>
           </thead>
           <tbody>
-            {opportunities.map((row) => (
+            {sortedOpportunities.map((row) => (
               <ArbitrageRow key={row.id} row={row} />
             ))}
           </tbody>
@@ -107,4 +145,10 @@ function statusLabel(status: MarketConnectionStatus) {
     offline: "오프라인",
   };
   return labels[status];
+}
+
+function parseSize(value: string) {
+  const normalized = value.replace(/[$,]/g, "");
+  const multiplier = normalized.endsWith("K") ? 1_000 : normalized.endsWith("M") ? 1_000_000 : normalized.endsWith("B") ? 1_000_000_000 : 1;
+  return Number.parseFloat(normalized) * multiplier || 0;
 }
