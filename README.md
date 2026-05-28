@@ -2,7 +2,7 @@
 
 Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simple Earn 상품, Futures 펀딩비, 스테이킹+숏 헤지 전략, arbitrage 가능성을 한 곳에서 모니터링하기 위한 개인용 대시보드 프로젝트입니다.
 
-현재 단계에서는 구현 전에 프로젝트 요구사항과 제품 방향을 정리하는 초기 기획 레포입니다. MVP는 서버 배포형 서비스가 아니라 로컬 개인용 앱으로 시작하며, 사용자는 GitHub에서 프로젝트를 clone한 뒤 자신의 환경에서 실행하는 방식을 기본으로 합니다.
+현재 단계에서는 로컬 개인용 MVP를 구현 중입니다. Vite React 프론트엔드와 Node 로컬 API 서버로 구성되어 있으며, 사용자는 GitHub에서 프로젝트를 clone한 뒤 자신의 `.env`를 설정해 실행하는 방식을 기본으로 합니다.
 
 ## 목표
 
@@ -20,21 +20,25 @@ Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simp
 
 ### Simple Earn Screener
 
-Simple Earn Flexible 상품을 APR, 한도, 구독 가능 여부, 관련 이벤트 기준으로 필터링하고 정렬하는 화면입니다. Locked 상품은 후속 확장 대상으로 둡니다.
+Simple Earn Flexible/Locked 상품을 APR, 한도, 구독 가능 여부, 관련 이벤트 기준으로 필터링하고 정렬하는 화면입니다. Binance signed Simple Earn API를 페이지네이션으로 호출해 가능한 상품을 수집합니다.
 
 ### Earn Events
 
-Binance Simple Earn 공지 페이지의 이벤트를 수집하고, 관련 코인 및 상품과 연결해서 보여주는 화면입니다.
+Binance Latest Activities 공지 페이지의 이벤트를 수집하고, 관련 코인 및 상품과 연결해서 보여주는 영역입니다.
 
 대상 공지:
 
 - https://www.binance.com/en/support/announcement/list/93
 
-MVP에서는 공지 페이지를 30분 간격으로 크롤링하고, 신규 공지가 발견되면 Telegram으로 알림을 보냅니다. 공지 상세에서는 특정 토큰의 APR, 이벤트 기간, 참여 조건, 한도 등을 자동 파싱해 Simple Earn Flexible 상품과 매칭합니다.
+현재 구현은 Binance CMS JSON endpoint를 통해 공지 목록을 가져오고, 최신 일부 공지는 상세 본문까지 가져와 토큰, 페어, APR/APY 문구, 보상 문구, 캠페인 기간 후보를 파싱합니다. Binance CMS가 허용하는 pageSize 값만 쓰도록 서버에서 정규화하고, 상세 본문 조회 실패 시 제목 기반 파싱으로 fallback합니다.
+
+Telegram 알림은 전체 이벤트가 아니라 APR/APY/Simple Earn/Flexible/Locked/Staking 계열 이벤트만 대상으로 합니다. 이미 보낸 공지 코드는 로컬 `.alert-state.json`에 저장하며, 이 파일은 git에 커밋하지 않습니다.
 
 ### Hedge Strategy Lab
 
 Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포지션으로 헤지하는 전략을 시뮬레이션합니다.
+
+현재 후보 코인은 `Simple Earn에 존재` + `USDT-M Perpetual Futures 상장` + `Spot USDT 거래 가능` 조건의 교집합으로 생성합니다. 검색형 드롭다운에서 코인명 또는 심볼로 빠르게 찾을 수 있습니다.
 
 주요 계산 항목:
 
@@ -44,18 +48,19 @@ Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포�
 - 거래 수수료
 - 슬리피지
 - 예상 순 APR
-- 청산 가격
-- 필요 증거금
+- 과거 가격 기반 백테스트
+
+청산 가격, 필요 증거금, 레버리지별 마진 리스크는 후속 구현 항목입니다.
 
 ### Arbitrage Monitor
 
-다양한 페어와 Spot-Futures 가격 차이를 모니터링하고, 설정한 기준을 넘는 기회가 발견되면 알림을 보냅니다.
+다양한 페어와 Spot-Futures 가격 차이를 모니터링합니다. 설정한 기준을 넘는 기회에 대한 Telegram 자동 알림은 후속 구현 항목입니다.
 
 초기 알림 채널 후보:
 
 - Telegram
 
-MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. Discord Webhook, Email, Browser Push는 후속 확장 후보입니다.
+MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. 현재 APR 이벤트 알림은 구현되어 있으며, arbitrage 조건 충족 알림, Discord Webhook, Email, Browser Push는 후속 확장 후보입니다.
 
 기존 봇:
 
@@ -79,14 +84,14 @@ MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. D
 초기 MVP는 다음 기능을 목표로 합니다.
 
 - 주요 코인 실시간 가격 대시보드
-- Simple Earn Flexible 상품 스크리너
-- Simple Earn 공지 연동
+- Simple Earn Flexible/Locked 상품 스크리너
+- Binance CMS 기반 Earning Event 공지 연동
 - 고APR 상품의 Futures 마켓 존재 여부 확인
 - 펀딩비 기반 예상 순 APR 계산
 - Spot-Futures 베이시스 모니터링
 - Binance 내부 페어 중심 arbitrage 모니터링
 - 실제 계정 잔고 조회 연동
-- Telegram Bot 알림
+- APR 이벤트 Telegram Bot 알림
 - 한국어 UI
 
 자동 주문 실행은 MVP 범위에서 제외합니다. 먼저 데이터 수집, 분석, 알림 중심으로 안정적인 모니터링 도구를 만드는 것을 우선합니다.
@@ -204,11 +209,16 @@ Simple Earn APR, Futures 펀딩비, 시장 가격, 유동성은 빠르게 변할
 
 - [요구 분석 문서](./REQUIREMENTS.md)
 - [UML 및 아키텍처 문서](./ARCHITECTURE.md)
+- [사용 설명서](./docs/USER_GUIDE.md)
 
 ## 현재 상태
 
-- 프로젝트 요구사항 정리 완료
-- Git 레포 초기화 완료
-- README 작성 완료
+- 주요 코인 실시간 가격 WebSocket 연동
+- Simple Earn Flexible/Locked 상품 수집 및 정렬
+- Binance CMS 기반 Earning Event 표시
+- APR 이벤트만 Telegram 및 앱 알림창에 반영
+- Earn + Futures 숏 전략 백테스트
+- Simple Earn + Spot + Futures 교집합 후보 검색
+- Binance 내부 arbitrage 후보 실시간 계산
 
-다음 단계는 MVP 기술 스택을 확정하고, 데이터 수집기와 첫 화면 구조를 설계하는 것입니다.
+다음 주요 작업은 백그라운드 스케줄러, arbitrage Telegram 알림, 실제 계정 잔고 기반 계산, Docker 배포 파일 추가입니다.

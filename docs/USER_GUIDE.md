@@ -90,15 +90,36 @@ Simple Earn 화면은 Binance signed API를 사용합니다.
 - Hot 표시
 - Product ID
 
+### Earning Events
+
+Earning Events 영역은 Binance 공지 페이지의 실제 데이터를 서버에서 가져와 표시합니다.
+
+사용 source:
+
+- `https://www.binance.com/en/support/announcement/list/93`
+- 내부 CMS JSON endpoint: `/bapi/composite/v1/public/cms/article/list/query`
+- 상세 본문 endpoint: `/bapi/composite/v1/public/cms/article/detail/query`
+
+서버는 공지 목록을 가져온 뒤 최신 일부 공지는 상세 본문까지 조회합니다. 본문에서 아래 후보 정보를 파싱합니다.
+
+- 토큰
+- 거래 페어
+- APR/APY 문구
+- 보상 문구
+- 캠페인 기간
+
+Binance CMS는 특정 `pageSize` 값만 허용하므로 서버에서 요청 크기를 `5`, `10`, `20` 중 하나로 정규화합니다. 상세 본문이 빈 응답을 반환하면 제목 기반 파싱으로 fallback합니다.
+
 ### Hedge Strategy Lab
 
-헤지 전략 페이지는 Simple Earn에 존재하면서 Binance USDT-M Perpetual Futures에도 상장된 코인만 후보로 표시합니다.
+헤지 전략 페이지는 Simple Earn에 존재하면서 Binance USDT-M Perpetual Futures와 Spot USDT 시장에도 상장된 코인만 후보로 표시합니다.
 
 후보 생성 기준:
 
 - Simple Earn 상품 목록에서 자산 추출
 - Binance Futures exchangeInfo에서 USDT perpetual trading symbol 추출
-- 두 목록의 base asset이 일치하는 코인만 표시
+- Binance Spot exchangeInfo에서 Spot USDT trading symbol 추출
+- 세 목록의 base asset과 symbol이 일치하는 코인만 표시
 
 백테스트 데이터:
 
@@ -178,7 +199,26 @@ Telegram 설정이 완료되면 시그널이나 테스트 메시지를 봇으로
 @Tturu_news_bot
 ```
 
-알림 기능은 이후 arbitrage 조건 충족, 고APR 이벤트 감지, funding fee 급변 감지 등에 연결할 수 있습니다.
+현재 구현된 자동 알림은 APR 이벤트 알림입니다.
+
+APR 이벤트 알림 기준:
+
+- Binance Earning Events 중 `APR`, `APY`, `Simple Earn`, `Flexible Product`, `Locked Product`, `staking` 계열 문구가 포함된 이벤트
+- 일반 trading tournament, zero fee campaign, 단순 rewards 이벤트는 Telegram APR 알림 대상에서 제외
+
+앱 내부 알림창과 메인 화면의 `Telegram Alerts` 패널도 같은 APR 이벤트 alert API를 사용합니다.
+
+중복 발송 방지:
+
+- 이미 Telegram으로 보낸 공지 코드는 로컬 `.alert-state.json`에 저장합니다.
+- `.alert-state.json`은 `.gitignore`에 포함되어 GitHub에 올라가지 않습니다.
+- 서버를 재시작해도 기존에 보낸 APR 이벤트는 다시 보내지 않는 것을 목표로 합니다.
+
+후속 연결 후보:
+
+- arbitrage 조건 충족 알림
+- funding fee 급변 알림
+- Simple Earn APR 급변 알림
 
 ## 8. AWS 배포 방향
 
