@@ -1,9 +1,10 @@
-import { RefreshCcw, Star } from "lucide-react";
+import { ExternalLink, RefreshCcw, Sparkles, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PanelHeader } from "../components/PanelHeader";
 import { SortMenu } from "../components/SortMenu";
+import { useEarningEvents } from "../hooks/useEarningEvents";
 import { useSimpleEarnProducts } from "../hooks/useSimpleEarnProducts";
-import type { SimpleEarnProduct } from "../types";
+import type { EarningEvent, SimpleEarnProduct } from "../types";
 
 type EarnSortKey = "apr" | "asset" | "minPurchaseAmount" | "status";
 type EarnTypeFilter = "ALL" | "FLEXIBLE" | "LOCKED";
@@ -27,8 +28,76 @@ const statusText = (product: SimpleEarnProduct) => {
   return product.status || "제한";
 };
 
+const eventTypeLabel: Record<EarningEvent["type"], string> = {
+  earn: "Earn",
+  fee: "Fee",
+  trading: "Trading",
+  launch: "Launch",
+  event: "Event",
+};
+
+const eventTypeClass: Record<EarningEvent["type"], string> = {
+  earn: "earn",
+  fee: "fee",
+  trading: "trading",
+  launch: "launch",
+  event: "event",
+};
+
+const formatEventDate = (releaseDate: number) => new Date(releaseDate).toLocaleString("ko-KR", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function EarningEventCard({ event }: { event: EarningEvent }) {
+  const highlights = [
+    ...event.apr.map((item) => ({ label: "APR", value: item })),
+    ...event.rewards.map((item) => ({ label: "Reward", value: item })),
+    ...event.periods.map((item) => ({ label: "Period", value: item })),
+  ].slice(0, 3);
+
+  return (
+    <article className="earning-event-card">
+      <div className="earning-event-head">
+        <span className={`event-type ${eventTypeClass[event.type]}`}>{eventTypeLabel[event.type]}</span>
+        <time>{formatEventDate(event.releaseDate)}</time>
+      </div>
+      <a href={event.url} target="_blank" rel="noreferrer">
+        <strong>{event.title}</strong>
+        <ExternalLink size={14} />
+      </a>
+      <div className="event-chip-row">
+        {event.assets.slice(0, 5).map((asset) => <span key={asset}>{asset}</span>)}
+        {event.pairs.slice(0, 3).map((pair) => <span key={pair}>{pair}</span>)}
+      </div>
+      {highlights.length > 0 ? (
+        <div className="event-highlight-list">
+          {highlights.map((item) => (
+            <p key={`${item.label}-${item.value}`}>
+              <small>{item.label}</small>
+              <span>{item.value}</span>
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="event-excerpt">{event.excerpt}</p>
+      )}
+    </article>
+  );
+}
+
 export function EarnPage() {
   const { products, isLoading, error, lastUpdatedAt, hotCount, purchasableCount } = useSimpleEarnProducts();
+  const {
+    events,
+    isLoading: isEventLoading,
+    error: eventError,
+    lastUpdatedAt: eventsUpdatedAt,
+    sourceUrl,
+    earnRelatedCount,
+  } = useEarningEvents();
   const [sortKey, setSortKey] = useState<EarnSortKey>("apr");
   const [typeFilter, setTypeFilter] = useState<EarnTypeFilter>("ALL");
   const [onlyPurchasable, setOnlyPurchasable] = useState(false);
@@ -67,6 +136,7 @@ export function EarnPage() {
     <section className="panel page-panel">
       <PanelHeader title="Earn Opportunity Screener" subtitle={`Simple Earn 전체 ${products.length}개 · 자산 ${assetCount}개 · ${lastUpdatedAt}`} action={isLoading ? "갱신 중" : `${purchasableCount} available`} />
       {error && <div className="inline-warning">Simple Earn API 연결 실패: {error}. 임시 데이터를 표시합니다.</div>}
+      {eventError && <div className="inline-warning">Earning Event 공지 연결 실패: {eventError}</div>}
       <div className="earn-summary-grid">
         <div>
           <small>전체 상품</small>
@@ -97,6 +167,22 @@ export function EarnPage() {
           <strong>{visibleProducts.length}</strong>
         </div>
       </div>
+      <section className="earning-events-panel">
+        <div className="earning-events-header">
+          <div>
+            <span className="eyebrow">Binance Announcement</span>
+            <h3>Earning Events</h3>
+            <p>Latest Activities 공지에서 토큰, APR, 보상, 캠페인 기간 후보를 파싱합니다. {eventsUpdatedAt}</p>
+          </div>
+          <a className="source-link" href={sourceUrl} target="_blank" rel="noreferrer">
+            <Sparkles size={16} />
+            {isEventLoading ? "불러오는 중" : `${events.length}개 · Earn 관련 ${earnRelatedCount}개`}
+          </a>
+        </div>
+        <div className="earning-event-grid">
+          {events.slice(0, 6).map((event) => <EarningEventCard event={event} key={event.code} />)}
+        </div>
+      </section>
       <div className="toolbar">
         <button className={`filter ${typeFilter === "ALL" ? "active" : ""}`} type="button" onClick={() => setTypeFilter("ALL")}>전체</button>
         <button className={`filter ${typeFilter === "FLEXIBLE" ? "active" : ""}`} type="button" onClick={() => setTypeFilter("FLEXIBLE")}>Flexible</button>

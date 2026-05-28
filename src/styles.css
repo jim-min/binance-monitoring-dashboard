@@ -1115,6 +1115,169 @@ tbody tr:hover {
   font-size: 24px;
 }
 
+.earning-events-panel {
+  margin-bottom: 14px;
+  padding: 16px;
+  background: #11161c;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.earning-events-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.earning-events-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.earning-events-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: #0b0e11;
+  text-decoration: none;
+  background: var(--yellow);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.earning-event-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.earning-event-card {
+  display: grid;
+  gap: 10px;
+  min-height: 196px;
+  padding: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.earning-event-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.earning-event-head time {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.event-type {
+  display: inline-flex;
+  padding: 5px 8px;
+  color: #0b0e11;
+  background: var(--yellow);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.event-type.trading {
+  color: var(--blue);
+  background: rgba(43, 127, 255, 0.12);
+}
+
+.event-type.fee {
+  color: var(--green);
+  background: rgba(14, 203, 129, 0.12);
+}
+
+.event-type.launch {
+  color: #ff8a3d;
+  background: rgba(255, 138, 61, 0.12);
+}
+
+.event-type.event {
+  color: var(--muted);
+  background: var(--surface-3);
+}
+
+.earning-event-card a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  color: var(--text);
+  text-decoration: none;
+  line-height: 1.38;
+}
+
+.earning-event-card a:hover {
+  color: var(--yellow-2);
+}
+
+.event-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.event-chip-row span {
+  padding: 4px 7px;
+  color: var(--yellow-2);
+  background: rgba(240, 185, 11, 0.1);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.event-highlight-list {
+  display: grid;
+  gap: 7px;
+}
+
+.event-highlight-list p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+
+.event-highlight-list small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.event-highlight-list span,
+.event-excerpt {
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.event-excerpt {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .tier-cell {
   max-width: 280px;
   overflow: hidden;
@@ -1703,6 +1866,7 @@ progress::-webkit-progress-value {
   .content-grid,
   .bottom-grid,
   .metrics-grid,
+  .earning-event-grid,
   .strategy-lab-grid,
   .strategy-results-grid,
   .strategy-detail-grid,
@@ -1719,6 +1883,7 @@ progress::-webkit-progress-value {
   .topbar,
   .topbar-actions,
   .panel-header,
+  .earning-events-header,
   .strategy-card {
     align-items: stretch;
     flex-direction: column;

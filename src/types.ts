@@ -140,3 +140,18 @@ export type HedgeCandidate = {
   hasLocked: boolean;
   canPurchase: boolean;
 };
+
+export type EarningEvent = {
+  id: number;
+  code: string;
+  title: string;
+  releaseDate: number;
+  url: string;
+  type: "earn" | "fee" | "trading" | "launch" | "event";
+  excerpt: string;
+  assets: string[];
+  pairs: string[];
+  apr: string[];
+  rewards: string[];
+  periods: string[];
+};

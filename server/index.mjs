@@ -5,6 +5,7 @@ import {
   fetchFlexibleEarnProducts,
   fetchLockedEarnProducts,
 } from "./binance.mjs";
+import { fetchEarningEvents } from "./earningEvents.mjs";
 import { configStatus, env } from "./env.mjs";
 import { runStrategyBacktest } from "./strategy.mjs";
 import { sendTelegramMessage } from "./telegram.mjs";
@@ -82,6 +83,21 @@ const server = createServer(async (request, response) => {
       ok: result.ok,
       ...result.data,
     });
+  }
+
+  if (method === "GET" && url.pathname === "/api/earning-events") {
+    try {
+      const result = await fetchEarningEvents(Object.fromEntries(url.searchParams));
+      return json(response, result.status, {
+        ok: result.ok,
+        ...result.data,
+      });
+    } catch (error) {
+      return json(response, 502, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Earning event fetch failed",
+      });
+    }
   }
 
   if (method === "GET" && url.pathname === "/api/strategy/backtest") {
