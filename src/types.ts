@@ -46,6 +46,8 @@ export type Alert = {
   body: string;
   time: string;
   level: "info" | "warning" | "success";
+  url?: string;
+  eventCode?: string;
 };
 
 export type ArbitrageSignal = {

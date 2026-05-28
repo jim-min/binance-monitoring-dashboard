@@ -54,9 +54,9 @@ const formatEventDate = (releaseDate: number) => new Date(releaseDate).toLocaleS
 function EarningEventCard({ event }: { event: EarningEvent }) {
   const highlights = [
     ...event.apr.map((item) => ({ label: "APR", value: item })),
-    ...event.rewards.map((item) => ({ label: "Reward", value: item })),
     ...event.periods.map((item) => ({ label: "Period", value: item })),
-  ].slice(0, 3);
+    ...event.rewards.map((item) => ({ label: "Reward", value: item })),
+  ].slice(0, 2);
 
   return (
     <article className="earning-event-card">
@@ -69,8 +69,7 @@ function EarningEventCard({ event }: { event: EarningEvent }) {
         <ExternalLink size={14} />
       </a>
       <div className="event-chip-row">
-        {event.assets.slice(0, 5).map((asset) => <span key={asset}>{asset}</span>)}
-        {event.pairs.slice(0, 3).map((pair) => <span key={pair}>{pair}</span>)}
+        {[...event.assets.slice(0, 3), ...event.pairs.slice(0, 2)].map((item) => <span key={item}>{item}</span>)}
       </div>
       {highlights.length > 0 ? (
         <div className="event-highlight-list">

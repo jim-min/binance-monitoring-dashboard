@@ -1,10 +1,11 @@
 import { Bell, Bot, RefreshCcw, Search, Server } from "lucide-react";
 import { useState } from "react";
-import { alerts } from "../../data/mock";
+import { useAprEventAlerts } from "../../hooks/useAprEventAlerts";
 import { AlertPopover } from "../alerts/AlertPopover";
 
 export function Topbar({ pageTitle }: { pageTitle: string }) {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const { alerts, error } = useAprEventAlerts({ notify: true });
 
   return (
     <header className="topbar">
@@ -20,7 +21,7 @@ export function Topbar({ pageTitle }: { pageTitle: string }) {
             <Bell size={18} />
             <span>{alerts.length}</span>
           </button>
-          {isAlertOpen && <AlertPopover onClose={() => setIsAlertOpen(false)} />}
+          {isAlertOpen && <AlertPopover alerts={alerts} error={error} onClose={() => setIsAlertOpen(false)} />}
         </div>
         <button className="pill-button" type="button"><Bot size={17} />@Tturu_news_bot</button>
         <button className="pill-button muted" type="button"><Server size={17} />Local</button>

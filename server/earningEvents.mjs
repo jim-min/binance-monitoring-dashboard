@@ -109,7 +109,10 @@ function extractSignals(text) {
   const pairs = unique([...normalized.matchAll(/\b([A-Z0-9]{2,20}\/(?:USDT|USDC|FDUSD|BTC|BNB|ETH|TRY|EUR))\b/g)].map((match) => match[1]));
   const pairAssets = pairs.map((pair) => pair.split("/")[0]);
   const parenthesisAssets = [...normalized.matchAll(/\(([A-Z0-9]{2,15})\)/g)].map((match) => match[1]);
-  const assets = unique([...pairAssets, ...parenthesisAssets])
+  const productAssets = [
+    ...normalized.matchAll(/\b(?:with|on|to)\s+([A-Z0-9]{1,15})\s+(?:Flexible|Locked|Simple Earn|Products?)/g),
+  ].map((match) => match[1]);
+  const assets = unique([...pairAssets, ...parenthesisAssets, ...productAssets])
     .filter((asset) => !IGNORED_ASSETS.has(asset))
     .slice(0, 12);
   const aprMatches = unique([...normalized.matchAll(/(?:up to\s*)?\d+(?:\.\d+)?\s*%\s*(?:APR|APY|rewards?|bonus|boost)?/gi)].map((match) => normalizeSpaces(match[0]))).slice(0, 6);
@@ -139,6 +142,32 @@ function classifyEvent(text) {
     return "launch";
   }
   return "event";
+}
+
+export function isAprEvent(event) {
+  const text = normalizeSpaces(`${event.title} ${event.excerpt} ${event.apr?.join(" ") ?? ""}`);
+  return event.type === "earn" && /apr|apy|simple earn|staking|locked product|flexible product/i.test(text);
+}
+
+export function mapAprEventAlert(event) {
+  const assets = event.assets?.length > 0 ? event.assets.slice(0, 4).join(", ") : "토큰 미확인";
+  const apr = event.apr?.length > 0 ? event.apr.slice(0, 2).join(" / ") : "APR 조건 본문 확인 필요";
+  const reward = event.rewards?.[0] ? ` · ${event.rewards[0]}` : "";
+
+  return {
+    title: event.title,
+    body: `${assets} · ${apr}${reward}`,
+    time: new Date(event.releaseDate).toLocaleString("ko-KR", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    level: "success",
+    url: event.url,
+    eventCode: event.code,
+    releaseDate: event.releaseDate,
+  };
 }
 
 async function fetchArticleDetail(article) {

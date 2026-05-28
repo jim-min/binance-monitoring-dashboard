@@ -1,14 +1,40 @@
 import { createServer } from "node:http";
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   fetchAllSimpleEarnProducts,
   fetchEarnFuturesUniverse,
   fetchFlexibleEarnProducts,
   fetchLockedEarnProducts,
 } from "./binance.mjs";
-import { fetchEarningEvents } from "./earningEvents.mjs";
+import { fetchEarningEvents, isAprEvent, mapAprEventAlert } from "./earningEvents.mjs";
 import { configStatus, env } from "./env.mjs";
 import { runStrategyBacktest } from "./strategy.mjs";
 import { sendTelegramMessage } from "./telegram.mjs";
+
+const alertStateFile = new URL("../.alert-state.json", import.meta.url);
+
+const loadNotifiedAprEventCodes = () => {
+  try {
+    const state = JSON.parse(readFileSync(alertStateFile, "utf8"));
+    return new Set(Array.isArray(state.notifiedAprEventCodes) ? state.notifiedAprEventCodes : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const notifiedAprEventCodes = loadNotifiedAprEventCodes();
+
+const saveNotifiedAprEventCodes = () => {
+  writeFileSync(alertStateFile, JSON.stringify({
+    notifiedAprEventCodes: [...notifiedAprEventCodes],
+    updatedAt: new Date().toISOString(),
+  }, null, 2));
+};
+
+const escapeHtml = (value) => String(value)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;");
 
 const json = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
@@ -96,6 +122,58 @@ const server = createServer(async (request, response) => {
       return json(response, 502, {
         ok: false,
         error: error instanceof Error ? error.message : "Earning event fetch failed",
+      });
+    }
+  }
+
+  if (method === "GET" && url.pathname === "/api/alerts/apr-events") {
+    try {
+      const shouldNotify = url.searchParams.get("notify") === "1";
+      const scanPages = Math.min(Math.max(Number(url.searchParams.get("pages") ?? 5), 1), 10);
+      const results = await Promise.all(Array.from({ length: scanPages }, (_, index) => fetchEarningEvents({
+        pageNo: String(index + 1),
+        pageSize: "20",
+        detailSize: "0",
+      })));
+      const events = results
+        .flatMap((result) => result.data.rows)
+        .filter(isAprEvent)
+        .sort((a, b) => b.releaseDate - a.releaseDate);
+      const alerts = events.map(mapAprEventAlert);
+      const newAlerts = alerts
+        .filter((alert) => !notifiedAprEventCodes.has(alert.eventCode))
+        .slice(0, 5);
+      let telegram = null;
+
+      if (shouldNotify && newAlerts.length > 0) {
+        const message = [
+          "<b>Binance APR Event Alert</b>",
+          ...newAlerts.map((alert) => [
+            "",
+            `<b>${escapeHtml(alert.title)}</b>`,
+            escapeHtml(alert.body),
+            alert.url,
+          ].join("\n")),
+        ].join("\n");
+        telegram = await sendTelegramMessage(message);
+
+        if (telegram.ok) {
+          newAlerts.forEach((alert) => notifiedAprEventCodes.add(alert.eventCode));
+          saveNotifiedAprEventCodes();
+        }
+      }
+
+      return json(response, 200, {
+        ok: true,
+        alerts,
+        total: alerts.length,
+        notified: shouldNotify ? newAlerts.length : 0,
+        telegram,
+      });
+    } catch (error) {
+      return json(response, 502, {
+        ok: false,
+        error: error instanceof Error ? error.message : "APR event alert fetch failed",
       });
     }
   }

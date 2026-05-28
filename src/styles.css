@@ -326,10 +326,32 @@ button {
   line-height: 1.45;
 }
 
+.popover-alert a,
+.alert-card a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.popover-alert a:hover,
+.alert-card a:hover {
+  color: var(--yellow-2);
+}
+
 .popover-alert time {
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.empty-alert {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
 }
 
 .pill-button,
@@ -1167,7 +1189,8 @@ tbody tr:hover {
 .earning-event-card {
   display: grid;
   gap: 10px;
-  min-height: 196px;
+  align-content: start;
+  min-height: 178px;
   padding: 13px;
   background: var(--surface-2);
   border: 1px solid var(--line);
@@ -1227,6 +1250,13 @@ tbody tr:hover {
   line-height: 1.38;
 }
 
+.earning-event-card a strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .earning-event-card a:hover {
   color: var(--yellow-2);
 }
@@ -1238,11 +1268,15 @@ tbody tr:hover {
 }
 
 .event-chip-row span {
+  max-width: 130px;
+  overflow: hidden;
   padding: 4px 7px;
   color: var(--yellow-2);
   background: rgba(240, 185, 11, 0.1);
   border-radius: 999px;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .event-highlight-list {
@@ -1268,6 +1302,13 @@ tbody tr:hover {
   color: var(--soft);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.event-highlight-list span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .event-excerpt {
