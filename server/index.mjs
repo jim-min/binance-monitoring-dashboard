@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFileSync, writeFileSync } from "node:fs";
 import {
   fetchAllSimpleEarnProducts,
+  fetchAccountPortfolio,
   fetchEarnFuturesUniverse,
   fetchFlexibleEarnProducts,
   fetchLockedEarnProducts,
@@ -23,6 +24,7 @@ const loadNotifiedAprEventCodes = () => {
 };
 
 const notifiedAprEventCodes = loadNotifiedAprEventCodes();
+const pendingAprEventCodes = new Set();
 
 const saveNotifiedAprEventCodes = () => {
   writeFileSync(alertStateFile, JSON.stringify({
@@ -87,6 +89,14 @@ const server = createServer(async (request, response) => {
     });
   }
 
+  if (method === "GET" && url.pathname === "/api/account/portfolio") {
+    const result = await fetchAccountPortfolio();
+    return json(response, result.status, {
+      ok: result.ok,
+      ...result.data,
+    });
+  }
+
   if (method === "GET" && url.pathname === "/api/simple-earn/flexible") {
     const result = await fetchFlexibleEarnProducts();
     return json(response, result.status, {
@@ -141,11 +151,12 @@ const server = createServer(async (request, response) => {
         .sort((a, b) => b.releaseDate - a.releaseDate);
       const alerts = events.map(mapAprEventAlert);
       const newAlerts = alerts
-        .filter((alert) => !notifiedAprEventCodes.has(alert.eventCode))
+        .filter((alert) => !notifiedAprEventCodes.has(alert.eventCode) && !pendingAprEventCodes.has(alert.eventCode))
         .slice(0, 5);
       let telegram = null;
 
       if (shouldNotify && newAlerts.length > 0) {
+        newAlerts.forEach((alert) => pendingAprEventCodes.add(alert.eventCode));
         const message = [
           "<b>Binance APR Event Alert</b>",
           ...newAlerts.map((alert) => [
@@ -155,11 +166,16 @@ const server = createServer(async (request, response) => {
             alert.url,
           ].join("\n")),
         ].join("\n");
-        telegram = await sendTelegramMessage(message);
 
-        if (telegram.ok) {
-          newAlerts.forEach((alert) => notifiedAprEventCodes.add(alert.eventCode));
-          saveNotifiedAprEventCodes();
+        try {
+          telegram = await sendTelegramMessage(message);
+
+          if (telegram.ok) {
+            newAlerts.forEach((alert) => notifiedAprEventCodes.add(alert.eventCode));
+            saveNotifiedAprEventCodes();
+          }
+        } finally {
+          newAlerts.forEach((alert) => pendingAprEventCodes.delete(alert.eventCode));
         }
       }
 

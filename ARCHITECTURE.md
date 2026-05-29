@@ -32,5 +32,7 @@
 - 로컬 API 서버는 Node.js HTTP 서버 기반이며 기본 포트는 `8787`이다.
 - 주요 실시간 가격과 arbitrage 후보는 Binance WebSocket 데이터를 사용한다.
 - Simple Earn 상품과 계정성 데이터는 Binance signed API를 사용하므로 `.env`의 Binance API key/secret이 필요하다.
+- Portfolio 패널은 Spot account, Simple Earn account summary, Spot ticker price를 조합해 잔고와 USDT 추정 평가액을 표시한다.
+- 현재 Portfolio 범위는 Spot과 Simple Earn 요약이며 Futures 포지션, Margin 계정, 전체 통합 계정 평가는 후속 구현 항목이다.
 - Telegram 알림은 `@Tturu_news_bot`에 연결된 Bot API 설정을 사용한다.
 - Docker/AWS 배포, 백그라운드 스케줄러, 실제 잔고 기반 계산, arbitrage Telegram 알림은 아직 후속 구현 항목이다.

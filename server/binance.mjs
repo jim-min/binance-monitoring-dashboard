@@ -138,6 +138,96 @@ export async function fetchSpotExchangeInfo() {
   return publicBinanceRequest(BINANCE_BASE_URL, "/api/v3/exchangeInfo");
 }
 
+export async function fetchAccountPortfolio() {
+  const [account, simpleEarn, tickerPrices] = await Promise.all([
+    signedBinanceRequest("/api/v3/account"),
+    signedBinanceRequest("/sapi/v1/simple-earn/account"),
+    publicBinanceRequest(BINANCE_BASE_URL, "/api/v3/ticker/price"),
+  ]);
+
+  if (!account.ok) {
+    return account;
+  }
+
+  const prices = new Map();
+  if (tickerPrices.ok && Array.isArray(tickerPrices.data)) {
+    for (const row of tickerPrices.data) {
+      prices.set(row.symbol, Number(row.price));
+    }
+  }
+
+  const estimateUsdtValue = (asset, amount) => {
+    if (asset === "USDT") {
+      return amount;
+    }
+    if (asset === "USDC" || asset === "FDUSD" || asset === "TUSD") {
+      return amount;
+    }
+    const direct = prices.get(`${asset}USDT`);
+    if (Number.isFinite(direct)) {
+      return amount * direct;
+    }
+    const btcPrice = prices.get("BTCUSDT");
+    const btcPair = prices.get(`${asset}BTC`);
+    if (Number.isFinite(btcPrice) && Number.isFinite(btcPair)) {
+      return amount * btcPair * btcPrice;
+    }
+    return 0;
+  };
+
+  const balances = (Array.isArray(account.data.balances) ? account.data.balances : [])
+    .map((balance) => {
+      const free = Number(balance.free ?? 0);
+      const locked = Number(balance.locked ?? 0);
+      const total = free + locked;
+      return {
+        asset: balance.asset,
+        free,
+        locked,
+        total,
+        usdtValue: estimateUsdtValue(balance.asset, total),
+      };
+    })
+    .filter((balance) => balance.total > 0)
+    .sort((a, b) => b.usdtValue - a.usdtValue);
+
+  const spotUsdtValue = balances.reduce((sum, balance) => sum + balance.usdtValue, 0);
+  const simpleEarnSummary = simpleEarn.ok ? {
+    totalAmountInBTC: Number(simpleEarn.data.totalAmountInBTC ?? 0),
+    totalAmountInUSDT: Number(simpleEarn.data.totalAmountInUSDT ?? 0),
+    totalFlexibleAmountInBTC: Number(simpleEarn.data.totalFlexibleAmountInBTC ?? 0),
+    totalFlexibleAmountInUSDT: Number(simpleEarn.data.totalFlexibleAmountInUSDT ?? 0),
+    totalLockedInBTC: Number(simpleEarn.data.totalLockedInBTC ?? 0),
+    totalLockedInUSDT: Number(simpleEarn.data.totalLockedInUSDT ?? 0),
+  } : null;
+
+  return {
+    ok: true,
+    status: 200,
+    data: {
+      accountType: account.data.accountType,
+      canTrade: account.data.canTrade,
+      canWithdraw: account.data.canWithdraw,
+      canDeposit: account.data.canDeposit,
+      updateTime: account.data.updateTime,
+      permissions: account.data.permissions ?? [],
+      balances,
+      totals: {
+        spotUsdtValue,
+        simpleEarnUsdtValue: simpleEarnSummary?.totalAmountInUSDT ?? 0,
+        combinedUsdtValue: spotUsdtValue + (simpleEarnSummary?.totalAmountInUSDT ?? 0),
+      },
+      simpleEarn: {
+        ok: simpleEarn.ok,
+        status: simpleEarn.status,
+        error: simpleEarn.ok ? null : simpleEarn.data,
+        summary: simpleEarnSummary,
+      },
+      pricedAt: new Date().toISOString(),
+    },
+  };
+}
+
 const earnAsset = (row) => {
   if (row.productType === "LOCKED") {
     return row.detail?.asset;

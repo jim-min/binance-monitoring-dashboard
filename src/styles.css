@@ -687,6 +687,116 @@ button {
   color: var(--muted);
 }
 
+.portfolio-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.portfolio-total-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid rgba(43, 127, 255, 0.22);
+  border-radius: var(--radius);
+}
+
+.portfolio-total-card small,
+.portfolio-split-grid small,
+.portfolio-balance-row small {
+  color: var(--muted);
+}
+
+.portfolio-total-card strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 28px;
+}
+
+.portfolio-total-card span:not(.metric-icon) {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.portfolio-total-card .metric-icon {
+  color: var(--blue);
+  flex: 0 0 auto;
+}
+
+.portfolio-split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portfolio-split-grid div {
+  min-height: 78px;
+  padding: 12px;
+  background: #11161c;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.portfolio-split-grid strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+.portfolio-permission-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-permission-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.portfolio-balance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.portfolio-balance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.portfolio-balance-row strong,
+.portfolio-balance-row small {
+  display: block;
+}
+
+.portfolio-balance-row small {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.portfolio-balance-row > span {
+  color: var(--green);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .toolbar {
   flex-wrap: wrap;
   gap: 8px;

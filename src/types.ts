@@ -157,3 +157,41 @@ export type EarningEvent = {
   rewards: string[];
   periods: string[];
 };
+
+export type PortfolioBalance = {
+  asset: string;
+  free: number;
+  locked: number;
+  total: number;
+  usdtValue: number;
+};
+
+export type AccountPortfolio = {
+  ok: boolean;
+  accountType: string;
+  canTrade: boolean;
+  canWithdraw: boolean;
+  canDeposit: boolean;
+  updateTime: number;
+  permissions: string[];
+  balances: PortfolioBalance[];
+  totals: {
+    spotUsdtValue: number;
+    simpleEarnUsdtValue: number;
+    combinedUsdtValue: number;
+  };
+  simpleEarn: {
+    ok: boolean;
+    status: number;
+    error: unknown;
+    summary: null | {
+      totalAmountInBTC: number;
+      totalAmountInUSDT: number;
+      totalFlexibleAmountInBTC: number;
+      totalFlexibleAmountInUSDT: number;
+      totalLockedInBTC: number;
+      totalLockedInUSDT: number;
+    };
+  };
+  pricedAt: string;
+};

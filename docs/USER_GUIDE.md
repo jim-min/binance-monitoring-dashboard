@@ -9,6 +9,7 @@
 주요 목적은 다음과 같습니다.
 
 - 메이저 코인의 실시간 가격 확인
+- Binance Spot/Simple Earn 잔고 요약 확인
 - Simple Earn 상품의 APR, 구독 가능 여부, 이벤트성 고APR 후보 확인
 - Simple Earn 보유 + Futures 숏 헤지 전략의 예상 수익률 비교
 - Binance 내부 spot/futures 차익 기회 감시
@@ -52,7 +53,7 @@ TELEGRAM_CHAT_ID=
 API_PORT=8787
 ```
 
-`BINANCE_API_KEY`와 `BINANCE_API_SECRET`은 Simple Earn 데이터를 가져오기 위해 필요합니다. 현재 앱은 조회 목적이므로 Binance API key 권한은 읽기 전용으로 설정하는 것을 권장합니다.
+`BINANCE_API_KEY`와 `BINANCE_API_SECRET`은 Simple Earn 데이터와 계정 잔고 요약을 가져오기 위해 필요합니다. 현재 앱은 조회 목적이므로 Binance API key 권한은 읽기 전용으로 설정하는 것을 권장합니다. 출금 권한은 절대 켜지 않는 것을 권장합니다.
 
 `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`는 알림 전송에 사용합니다.
 
@@ -69,6 +70,35 @@ API_PORT=8787
 - 거래대금
 - 고가/저가
 - 스프레드 추정값
+
+### Portfolio
+
+Portfolio 패널은 Binance API key를 사용해 계정 잔고를 읽어옵니다.
+
+사용 endpoint:
+
+- Spot account: `/api/v3/account`
+- Simple Earn account summary: `/sapi/v1/simple-earn/account`
+- Spot ticker price: `/api/v3/ticker/price`
+
+표시 정보:
+
+- Spot 추정 평가액
+- Simple Earn 추정 평가액
+- Flexible Earn 평가액
+- Locked Earn 평가액
+- 상위 Spot 보유 자산
+- Binance account type과 거래 가능 상태
+
+Spot 자산의 USDT 평가는 `ASSETUSDT` 가격을 우선 사용합니다. 해당 가격이 없으면 `ASSETBTC`와 `BTCUSDT`를 조합해 추정하고, 가격 경로가 없으면 0으로 표시합니다. 따라서 실제 Binance 앱의 총 평가액과 약간 다를 수 있습니다.
+
+현재 포함하지 않는 항목:
+
+- Futures 포지션
+- Margin 계정
+- Funding 수익 미수금
+- 전체 통합 계정 평가액
+- 세금, 입출금 수수료, 체결 비용
 
 ### Simple Earn
 

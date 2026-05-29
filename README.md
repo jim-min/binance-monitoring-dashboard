@@ -11,12 +11,27 @@ Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simp
 - Simple Earn 관련 Binance 공지를 함께 보여주어 이벤트성 APR을 빠르게 파악합니다.
 - 고APR Earn 상품에 대해 Futures 숏 포지션을 결합했을 때 예상 순수익과 리스크를 계산합니다.
 - Spot, Futures, 여러 페어 간 arbitrage 후보를 감지하고 알림을 받을 수 있게 합니다.
+- Binance Spot 잔고와 Simple Earn 계정 요약을 확인합니다.
 
 ## 핵심 화면
 
 ### Market Watch
 
 주요 코인의 실시간 가격, 24시간 등락률, 거래량, 호가, 미니 차트를 보여주는 화면입니다.
+
+### Portfolio
+
+Binance 읽기 전용 API key를 사용해 Spot 계정 잔고와 Simple Earn 계정 요약을 표시합니다. Spot 자산은 Binance ticker price 기준으로 USDT 평가액을 근사 계산하고, Simple Earn은 Binance Simple Earn account summary의 USDT 값을 사용합니다.
+
+현재 표시 항목:
+
+- Spot 추정 평가액
+- Simple Earn 전체 평가액
+- Flexible Earn 평가액
+- Locked Earn 평가액
+- 상위 Spot 보유 자산
+
+Futures 포지션, Cross/Isolated Margin, Funding 미수금, 전체 통합 계정 평가는 후속 구현 항목입니다.
 
 ### Simple Earn Screener
 
@@ -214,6 +229,7 @@ Simple Earn APR, Futures 펀딩비, 시장 가격, 유동성은 빠르게 변할
 ## 현재 상태
 
 - 주요 코인 실시간 가격 WebSocket 연동
+- Binance Spot/Simple Earn 잔고 요약 연동
 - Simple Earn Flexible/Locked 상품 수집 및 정렬
 - Binance CMS 기반 Earning Event 표시
 - APR 이벤트만 Telegram 및 앱 알림창에 반영
