@@ -99,25 +99,20 @@ const nearestFutureCandle = (futuresKlines, openTime) => {
   return closest;
 };
 
-export async function runStrategyBacktest(params) {
-  const symbol = String(params.symbol ?? "TRXUSDT").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const requestedDays = clamp(Math.round(toNumber(params.days, 30)), 1, 180);
-  const principal = Math.max(toNumber(params.principal, 10000), 1);
-  const earnApr = normalizeRate(params.earnApr ?? 0.12);
-  const hedgeRatio = clamp(normalizeRate(params.hedgeRatio ?? 1), 0, 2);
-  const spotFeeRate = Math.max(toNumber(params.spotFeeBps, 10), 0) / 10000;
-  const futuresFeeRate = Math.max(toNumber(params.futuresFeeBps, 5), 0) / 10000;
-  const slippageRate = Math.max(toNumber(params.slippageBps, 2), 0) / 10000;
-  const interval = requestedDays <= 7 ? "1h" : "1d";
-  const endTime = Date.now();
-  const startTime = endTime - requestedDays * DAY_MS;
-
-  const [spotKlines, futuresKlines, fundingRates] = await Promise.all([
-    fetchKlines({ market: "spot", symbol, startTime, endTime, interval }),
-    fetchKlines({ market: "futures", symbol, startTime, endTime, interval }),
-    fetchFundingRates({ symbol, startTime, endTime }),
-  ]);
-
+export function calculateStrategyBacktest({
+  symbol = "TRXUSDT",
+  requestedDays = 30,
+  principal = 10000,
+  earnApr = 0.12,
+  hedgeRatio = 1,
+  spotFeeRate = 0.001,
+  futuresFeeRate = 0.0005,
+  slippageRate = 0.0002,
+  interval = "1d",
+  spotKlines,
+  futuresKlines,
+  fundingRates,
+}) {
   if (spotKlines.length < 2 || futuresKlines.length < 2) {
     throw new Error("Not enough historical candles for this symbol");
   }
@@ -222,4 +217,43 @@ export async function runStrategyBacktest(params) {
     },
     series,
   };
+}
+
+export async function runStrategyBacktest(params) {
+  const symbol = String(params.symbol ?? "TRXUSDT").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const requestedDays = clamp(Math.round(toNumber(params.days, 30)), 1, 180);
+  const principal = Math.max(toNumber(params.principal, 10000), 1);
+  const earnApr = normalizeRate(params.earnApr ?? 0.12);
+  const hedgeRatio = clamp(normalizeRate(params.hedgeRatio ?? 1), 0, 2);
+  const spotFeeRate = Math.max(toNumber(params.spotFeeBps, 10), 0) / 10000;
+  const futuresFeeRate = Math.max(toNumber(params.futuresFeeBps, 5), 0) / 10000;
+  const slippageRate = Math.max(toNumber(params.slippageBps, 2), 0) / 10000;
+  const interval = requestedDays <= 7 ? "1h" : "1d";
+  const endTime = Date.now();
+  const startTime = endTime - requestedDays * DAY_MS;
+
+  const [spotKlines, futuresKlines, fundingRates] = await Promise.all([
+    fetchKlines({ market: "spot", symbol, startTime, endTime, interval }),
+    fetchKlines({ market: "futures", symbol, startTime, endTime, interval }),
+    fetchFundingRates({ symbol, startTime, endTime }),
+  ]);
+
+  if (spotKlines.length < 2 || futuresKlines.length < 2) {
+    throw new Error("Not enough historical candles for this symbol");
+  }
+
+  return calculateStrategyBacktest({
+    symbol,
+    requestedDays,
+    principal,
+    earnApr,
+    hedgeRatio,
+    spotFeeRate,
+    futuresFeeRate,
+    slippageRate,
+    interval,
+    spotKlines,
+    futuresKlines,
+    fundingRates,
+  });
 }

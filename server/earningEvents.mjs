@@ -144,6 +144,16 @@ function classifyEvent(text) {
   return "event";
 }
 
+export function parseEventText(text) {
+  const normalized = normalizeSpaces(text);
+
+  return {
+    type: classifyEvent(normalized),
+    excerpt: normalized.slice(0, 260),
+    ...extractSignals(normalized),
+  };
+}
+
 export function isAprEvent(event) {
   const text = normalizeSpaces(`${event.title} ${event.excerpt} ${event.apr?.join(" ") ?? ""}`);
   return event.type === "earn" && /apr|apy|simple earn|staking|locked product|flexible product/i.test(text);
@@ -181,7 +191,7 @@ async function fetchArticleDetail(article) {
     collectBodyText(bodyTree),
     collectBodyText(contentTree),
   ].join(" "));
-  const signals = extractSignals(text);
+  const parsed = parseEventText(text);
 
   return {
     id: detail.id ?? article.id,
@@ -189,24 +199,19 @@ async function fetchArticleDetail(article) {
     title: detail.title ?? article.title,
     releaseDate: detail.publishDate ?? article.releaseDate,
     url: `${BINANCE_WEB_BASE_URL}/en/support/announcement/${detail.code ?? article.code}`,
-    type: classifyEvent(text),
-    excerpt: text.slice(0, 260),
-    ...signals,
+    ...parsed,
   };
 }
 
 function mapLightweightArticle(article) {
-  const text = normalizeSpaces(article.title);
-  const signals = extractSignals(text);
+  const parsed = parseEventText(article.title);
   return {
     id: article.id,
     code: article.code,
     title: article.title,
     releaseDate: article.releaseDate,
     url: `${BINANCE_WEB_BASE_URL}/en/support/announcement/${article.code}`,
-    type: classifyEvent(text),
-    excerpt: text,
-    ...signals,
+    ...parsed,
   };
 }
 
