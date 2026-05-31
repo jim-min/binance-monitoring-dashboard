@@ -20,6 +20,16 @@ const formatNumber = (value: number, digits = 4) => new Intl.NumberFormat("en-US
   maximumFractionDigits: digits,
 }).format(value);
 
+const toDateInputValue = (date: Date) => date.toISOString().slice(0, 10);
+
+const todayDateValue = () => toDateInputValue(new Date());
+
+const daysAgoDateValue = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return toDateInputValue(date);
+};
+
 function NumericField({
   label,
   value,
@@ -50,6 +60,32 @@ function NumericField({
           onChange={(event) => onChange(Number(event.target.value))}
         />
         {suffix ? <em>{suffix}</em> : null}
+      </div>
+    </label>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  max?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="strategy-field">
+      <span>{label}</span>
+      <div>
+        <input
+          type="date"
+          value={value}
+          max={max}
+          onChange={(event) => onChange(event.target.value)}
+        />
       </div>
     </label>
   );
@@ -126,7 +162,8 @@ function StrategyTimeline({ data }: { data: StrategyBacktest }) {
 export function HedgePage() {
   const [symbol, setSymbol] = useState("TRXUSDT");
   const [principal, setPrincipal] = useState(10000);
-  const [days, setDays] = useState(30);
+  const [startDate, setStartDate] = useState(daysAgoDateValue(30));
+  const [endDate, setEndDate] = useState(todayDateValue());
   const [earnAprPct, setEarnAprPct] = useState(18.6);
   const [hedgeRatioPct, setHedgeRatioPct] = useState(100);
   const [spotFeeBps, setSpotFeeBps] = useState(10);
@@ -147,7 +184,8 @@ export function HedgePage() {
   const { data, isLoading, error } = useStrategyBacktest({
     symbol,
     principal,
-    days,
+    startDate,
+    endDate,
     earnAprPct,
     hedgeRatioPct,
     spotFeeBps,
@@ -218,8 +256,11 @@ export function HedgePage() {
           ) : null}
 
           <NumericField label="투입 자금" value={principal} min={100} step={100} suffix="USDT" onChange={setPrincipal} />
-          <NumericField label="백테스트 기간" value={days} min={1} max={180} step={1} suffix="일" onChange={setDays} />
-          <NumericField label="Earn APR" value={earnAprPct} min={0} step={0.1} suffix="%" onChange={setEarnAprPct} />
+          <div className="strategy-date-range">
+            <DateField label="시작일" value={startDate} max={endDate} onChange={setStartDate} />
+            <DateField label="종료일" value={endDate} max={todayDateValue()} onChange={setEndDate} />
+          </div>
+          <NumericField label="Fallback Earn APR" value={earnAprPct} min={0} step={0.1} suffix="%" onChange={setEarnAprPct} />
           <NumericField label="숏 헤지 비율" value={hedgeRatioPct} min={0} max={200} step={5} suffix="%" onChange={setHedgeRatioPct} />
           <NumericField label="Spot 수수료" value={spotFeeBps} min={0} step={1} suffix="bps" onChange={setSpotFeeBps} />
           <NumericField label="Futures 수수료" value={futuresFeeBps} min={0} step={1} suffix="bps" onChange={setFuturesFeeBps} />
@@ -227,7 +268,7 @@ export function HedgePage() {
 
           <div className="strategy-note">
             <Shield size={16} />
-            <span>가격 히스토리와 펀딩 히스토리 기준의 추정값입니다. 실제 주문 체결, 담보율, 청산 가격은 별도 리스크 계산이 필요합니다.</span>
+            <span>선택 기간의 Spot/Futures 가격, Funding Fee History, Flexible Earn APR History를 우선 사용합니다. Earn APR 히스토리가 비어 있으면 fallback APR로 계산합니다.</span>
           </div>
         </aside>
 
@@ -287,9 +328,45 @@ export function HedgePage() {
                   <small>평균 펀딩</small>
                   <strong>{formatPct(data?.funding.averageFundingRate ?? 0, 4)}</strong>
                 </div>
+                <div>
+                  <small>평균 Earn APR</small>
+                  <strong>{formatPct(data?.earn.averageApr ?? 0, 3)}</strong>
+                </div>
+                <div>
+                  <small>APR 히스토리</small>
+                  <strong>{data?.earn.records ?? 0}개</strong>
+                </div>
               </div>
             </article>
           </div>
+
+          <article className="strategy-section">
+            <div className="strategy-section-head">
+              <Activity size={18} />
+              <strong>히스토리 데이터 소스</strong>
+            </div>
+            <div className="history-source-grid">
+              <div>
+                <small>백테스트 기간</small>
+                <strong>{data ? `${new Date(data.assumptions.startTime).toLocaleDateString("ko-KR")} - ${new Date(data.assumptions.endTime).toLocaleDateString("ko-KR")}` : "-"}</strong>
+              </div>
+              <div>
+                <small>가격 캔들</small>
+                <strong>{data?.series.length ?? 0}개 · {data?.assumptions.interval ?? "-"}</strong>
+              </div>
+              <div>
+                <small>Funding History</small>
+                <strong>{data?.funding.count ?? 0}개 · +{data?.funding.positiveCount ?? 0} / -{data?.funding.negativeCount ?? 0}</strong>
+              </div>
+              <div>
+                <small>Earn APR History</small>
+                <strong>{data?.earn.source === "history" ? `실제 히스토리 · ${data.earn.productId}` : "Fallback APR 사용"}</strong>
+              </div>
+            </div>
+            {data?.earn.error ? (
+              <p className="strategy-source-note">Earn APR 히스토리 조회 실패: {data.earn.error}</p>
+            ) : null}
+          </article>
 
           <article className="strategy-section">
             <div className="strategy-section-head">

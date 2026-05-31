@@ -79,6 +79,7 @@ export type StrategyBacktestPoint = {
   time: string;
   spotClose: number;
   futuresClose: number;
+  earnApr: number;
   fundingPnl: number;
   earnOnlyPnl: number;
   shortOnlyPnl: number;
@@ -92,6 +93,8 @@ export type StrategyBacktest = {
   assumptions: {
     requestedDays: number;
     actualDays: number;
+    startTime: number;
+    endTime: number;
     principal: number;
     earnApr: number;
     hedgeRatio: number;
@@ -122,6 +125,17 @@ export type StrategyBacktest = {
     count: number;
     averageFundingRate: number;
     annualizedFundingPct: number;
+    positiveCount: number;
+    negativeCount: number;
+  };
+  earn: {
+    source: "history" | "manual" | "unavailable";
+    productId: string | null;
+    records: number;
+    averageApr: number;
+    fallbackApr: number;
+    latestApr: number;
+    error: string | null;
   };
   results: {
     earnOnly: StrategyResult;

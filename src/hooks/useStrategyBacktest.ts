@@ -6,7 +6,8 @@ const API_BASE_URL = "http://127.0.0.1:8787";
 export type StrategyBacktestParams = {
   symbol: string;
   principal: number;
-  days: number;
+  startDate: string;
+  endDate: string;
   earnAprPct: number;
   hedgeRatioPct: number;
   spotFeeBps: number;
@@ -20,10 +21,13 @@ export function useStrategyBacktest(params: StrategyBacktestParams) {
   const [error, setError] = useState<string | null>(null);
 
   const query = useMemo(() => {
+    const startTime = new Date(`${params.startDate}T00:00:00.000Z`).getTime();
+    const endTime = new Date(`${params.endDate}T23:59:59.999Z`).getTime();
     const search = new URLSearchParams({
       symbol: params.symbol,
       principal: String(params.principal),
-      days: String(params.days),
+      startTime: String(startTime),
+      endTime: String(endTime),
       earnApr: String(params.earnAprPct / 100),
       hedgeRatio: String(params.hedgeRatioPct / 100),
       spotFeeBps: String(params.spotFeeBps),
@@ -32,13 +36,14 @@ export function useStrategyBacktest(params: StrategyBacktestParams) {
     });
     return search.toString();
   }, [
-    params.days,
     params.earnAprPct,
+    params.endDate,
     params.futuresFeeBps,
     params.hedgeRatioPct,
     params.principal,
     params.slippageBps,
     params.spotFeeBps,
+    params.startDate,
     params.symbol,
   ]);
 

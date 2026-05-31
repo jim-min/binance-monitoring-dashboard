@@ -1,6 +1,10 @@
 const SPOT_BASE_URL = "https://api.binance.com";
 const FUTURES_BASE_URL = "https://fapi.binance.com";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_BACKTEST_DAYS = 365;
+const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+import { fetchFlexibleEarnProducts, signedBinanceRequest } from "./binance.mjs";
 
 const toNumber = (value, fallback = 0) => {
   const number = Number(value);
@@ -26,6 +30,20 @@ async function fetchJson(url) {
   return data;
 }
 
+const historyCache = new Map();
+
+const getCached = async (key, factory) => {
+  const now = Date.now();
+  const cached = historyCache.get(key);
+  if (cached && now - cached.cachedAt < HISTORY_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const value = await factory();
+  historyCache.set(key, { cachedAt: now, value });
+  return value;
+};
+
 async function fetchKlines({ market, symbol, startTime, endTime, interval }) {
   const baseUrl = market === "futures" ? FUTURES_BASE_URL : SPOT_BASE_URL;
   const path = market === "futures" ? "/fapi/v1/klines" : "/api/v3/klines";
@@ -50,18 +68,121 @@ async function fetchKlines({ market, symbol, startTime, endTime, interval }) {
 }
 
 async function fetchFundingRates({ symbol, startTime, endTime }) {
-  const params = new URLSearchParams({
-    symbol,
-    startTime: String(startTime),
-    endTime: String(endTime),
-    limit: "1000",
-  });
-  const rows = await fetchJson(`${FUTURES_BASE_URL}/fapi/v1/fundingRate?${params.toString()}`);
+  const rows = [];
+  let cursor = startTime;
+
+  while (cursor <= endTime) {
+    const params = new URLSearchParams({
+      symbol,
+      startTime: String(cursor),
+      endTime: String(endTime),
+      limit: "1000",
+    });
+    const page = await fetchJson(`${FUTURES_BASE_URL}/fapi/v1/fundingRate?${params.toString()}`);
+    rows.push(...page);
+
+    if (!Array.isArray(page) || page.length < 1000) {
+      break;
+    }
+
+    const last = page[page.length - 1];
+    cursor = Number(last.fundingTime) + 1;
+  }
 
   return rows.map((row) => ({
     fundingTime: row.fundingTime,
     fundingRate: toNumber(row.fundingRate),
+    markPrice: toNumber(row.markPrice),
   }));
+}
+
+async function fetchFlexibleEarnProduct(asset) {
+  const products = await getCached("flexible-products", async () => {
+    const result = await fetchFlexibleEarnProducts();
+    if (!result.ok) {
+      throw new Error(result.data?.msg ?? "Flexible Earn product fetch failed");
+    }
+    return Array.isArray(result.data.rows) ? result.data.rows : [];
+  });
+  const normalizedAsset = String(asset).toUpperCase();
+  const matches = products.filter((row) => String(row.asset ?? "").toUpperCase() === normalizedAsset);
+
+  return matches
+    .sort((a, b) => {
+      const purchaseScore = Number(Boolean(b.canPurchase && !b.isSoldOut)) - Number(Boolean(a.canPurchase && !a.isSoldOut));
+      if (purchaseScore !== 0) {
+        return purchaseScore;
+      }
+      return toNumber(b.latestAnnualPercentageRate) - toNumber(a.latestAnnualPercentageRate);
+    })[0] ?? null;
+}
+
+async function fetchEarnRateHistory({ asset, startTime, endTime }) {
+  try {
+    const product = await fetchFlexibleEarnProduct(asset);
+    if (!product?.productId) {
+      return {
+        source: "unavailable",
+        asset,
+        productId: null,
+        rows: [],
+        error: "Flexible Earn product was not found for this asset",
+      };
+    }
+
+    const rows = [];
+    let current = 1;
+    while (current <= 10) {
+      const result = await signedBinanceRequest("/sapi/v1/simple-earn/flexible/history/rateHistory", {
+        productId: product.productId,
+        aprPeriod: "DAY",
+        startTime: String(startTime),
+        endTime: String(endTime),
+        current: String(current),
+        size: "100",
+      });
+
+      if (!result.ok) {
+        return {
+          source: "unavailable",
+          asset,
+          productId: product.productId,
+          rows: [],
+          error: result.data?.msg ?? "Flexible Earn rate history fetch failed",
+        };
+      }
+
+      const pageRows = Array.isArray(result.data.rows) ? result.data.rows : [];
+      rows.push(...pageRows.map((row) => ({
+        productId: row.productId ?? product.productId,
+        asset: row.asset ?? asset,
+        annualPercentageRate: normalizeRate(row.annualPercentageRate),
+        time: Number(row.time),
+      })).filter((row) => Number.isFinite(row.time)));
+
+      const total = Number(result.data.total ?? rows.length);
+      if (pageRows.length < 100 || rows.length >= total) {
+        break;
+      }
+      current += 1;
+    }
+
+    return {
+      source: rows.length > 0 ? "history" : "unavailable",
+      asset,
+      productId: product.productId,
+      rows: rows.sort((a, b) => a.time - b.time),
+      error: rows.length > 0 ? null : "Flexible Earn rate history returned no rows",
+    };
+  } catch (error) {
+    return {
+      source: "unavailable",
+      asset,
+      productId: null,
+      rows: [],
+      error: error instanceof Error ? error.message : "Flexible Earn rate history fetch failed",
+    };
+  }
 }
 
 const pnlToResult = ({ pnl, principal, days }) => ({
@@ -70,8 +191,33 @@ const pnlToResult = ({ pnl, principal, days }) => ({
   annualizedApr: principal > 0 ? (pnl / principal) * (365 / days) : 0,
 });
 
-const summarizeFunding = (fundingRates, shortNotional) => {
-  const fundingPnl = fundingRates.reduce((sum, row) => sum + shortNotional * row.fundingRate, 0);
+const nearestCandle = (klines, time) => {
+  let closest = klines[0];
+  let closestDistance = Math.abs((closest?.openTime ?? 0) - time);
+
+  for (const candle of klines) {
+    const distance = Math.min(
+      Math.abs(candle.openTime - time),
+      Math.abs(candle.closeTime - time),
+    );
+    if (distance <= closestDistance) {
+      closest = candle;
+      closestDistance = distance;
+    }
+  }
+
+  return closest;
+};
+
+const fundingNotional = (row, futuresKlines, futuresQty) => {
+  if (Number.isFinite(row.markPrice) && row.markPrice > 0) {
+    return futuresQty * row.markPrice;
+  }
+  return futuresQty * (nearestCandle(futuresKlines, row.fundingTime)?.close ?? 0);
+};
+
+const summarizeFunding = (fundingRates, futuresKlines, futuresQty) => {
+  const fundingPnl = fundingRates.reduce((sum, row) => sum + fundingNotional(row, futuresKlines, futuresQty) * row.fundingRate, 0);
   const averageFundingRate = fundingRates.length > 0
     ? fundingRates.reduce((sum, row) => sum + row.fundingRate, 0) / fundingRates.length
     : 0;
@@ -81,6 +227,8 @@ const summarizeFunding = (fundingRates, shortNotional) => {
     fundingPnl,
     averageFundingRate,
     annualizedFundingPct: averageFundingRate * 3 * 365,
+    positiveCount: fundingRates.filter((row) => row.fundingRate > 0).length,
+    negativeCount: fundingRates.filter((row) => row.fundingRate < 0).length,
   };
 };
 
@@ -102,8 +250,14 @@ const nearestFutureCandle = (futuresKlines, openTime) => {
 export function calculateStrategyBacktest({
   symbol = "TRXUSDT",
   requestedDays = 30,
+  startTime,
+  endTime,
   principal = 10000,
   earnApr = 0.12,
+  earnRateHistory = [],
+  earnHistorySource = "manual",
+  earnProductId = null,
+  earnHistoryError = null,
   hedgeRatio = 1,
   spotFeeRate = 0.001,
   futuresFeeRate = 0.0005,
@@ -127,10 +281,41 @@ export function calculateStrategyBacktest({
   const futuresQty = firstFutures.close > 0 ? shortNotional / firstFutures.close : 0;
   const exitSpotValue = spotQty * lastSpot.close;
   const exitFuturesNotional = futuresQty * lastFutures.close;
-  const earnPnl = principal * earnApr * (actualDays / 365);
   const spotPricePnl = exitSpotValue - principal;
   const shortPricePnl = (firstFutures.close - lastFutures.close) * futuresQty;
-  const funding = summarizeFunding(fundingRates, shortNotional);
+  const funding = summarizeFunding(fundingRates, futuresKlines, futuresQty);
+  const sortedEarnRates = earnRateHistory
+    .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.annualPercentageRate))
+    .sort((a, b) => a.time - b.time);
+  const rateForTime = (time) => {
+    if (sortedEarnRates.length === 0) {
+      return earnApr;
+    }
+
+    let selected = sortedEarnRates[0];
+    for (const row of sortedEarnRates) {
+      if (row.time <= time) {
+        selected = row;
+      } else {
+        break;
+      }
+    }
+    return selected.annualPercentageRate;
+  };
+
+  let earnedQty = 0;
+  let weightedAprDays = 0;
+  let previousEarnTime = firstSpot.openTime;
+  for (const spotCandle of spotKlines) {
+    const intervalDays = Math.max((spotCandle.closeTime - previousEarnTime) / DAY_MS, 0);
+    const intervalApr = rateForTime(spotCandle.openTime);
+    earnedQty += spotQty * intervalApr * (intervalDays / 365);
+    weightedAprDays += intervalApr * intervalDays;
+    previousEarnTime = spotCandle.closeTime;
+  }
+
+  const earnPnl = earnedQty * lastSpot.close;
+  const averageEarnApr = actualDays > 0 ? weightedAprDays / actualDays : earnApr;
   const spotFees = principal * spotFeeRate + exitSpotValue * spotFeeRate;
   const futuresFees = shortNotional * futuresFeeRate + exitFuturesNotional * futuresFeeRate;
   const spotSlippage = (principal + exitSpotValue) * slippageRate;
@@ -142,17 +327,22 @@ export function calculateStrategyBacktest({
 
   let cumulativeFunding = 0;
   let fundingIndex = 0;
+  let cumulativeEarnedQty = 0;
+  let previousSeriesEarnTime = firstSpot.openTime;
   const series = spotKlines.map((spotCandle) => {
     const futuresCandle = nearestFutureCandle(futuresKlines, spotCandle.openTime);
     while (fundingRates[fundingIndex] && fundingRates[fundingIndex].fundingTime <= spotCandle.closeTime) {
-      cumulativeFunding += shortNotional * fundingRates[fundingIndex].fundingRate;
+      cumulativeFunding += fundingNotional(fundingRates[fundingIndex], futuresKlines, futuresQty) * fundingRates[fundingIndex].fundingRate;
       fundingIndex += 1;
     }
 
-    const elapsedDays = Math.max((spotCandle.closeTime - firstSpot.openTime) / DAY_MS, 0);
+    const intervalDays = Math.max((spotCandle.closeTime - previousSeriesEarnTime) / DAY_MS, 0);
+    const currentApr = rateForTime(spotCandle.openTime);
+    cumulativeEarnedQty += spotQty * currentApr * (intervalDays / 365);
+    previousSeriesEarnTime = spotCandle.closeTime;
     const currentSpotValue = spotQty * spotCandle.close;
     const currentFuturesNotional = futuresQty * futuresCandle.close;
-    const currentEarnPnl = principal * earnApr * (elapsedDays / 365);
+    const currentEarnPnl = cumulativeEarnedQty * spotCandle.close;
     const currentSpotPnl = currentSpotValue - principal;
     const currentShortPnl = (firstFutures.close - futuresCandle.close) * futuresQty;
     const currentSpotFees = principal * spotFeeRate + currentSpotValue * spotFeeRate;
@@ -164,6 +354,7 @@ export function calculateStrategyBacktest({
       time: new Date(spotCandle.closeTime).toISOString(),
       spotClose: spotCandle.close,
       futuresClose: futuresCandle.close,
+      earnApr: currentApr,
       fundingPnl: cumulativeFunding,
       earnOnlyPnl: currentEarnPnl + currentSpotPnl - currentSpotFees - currentSpotSlippage,
       shortOnlyPnl: currentShortPnl + cumulativeFunding - currentFuturesFees - currentFuturesSlippage,
@@ -179,6 +370,8 @@ export function calculateStrategyBacktest({
     assumptions: {
       requestedDays,
       actualDays,
+      startTime: startTime ?? firstSpot.openTime,
+      endTime: endTime ?? lastSpot.closeTime,
       principal,
       earnApr,
       hedgeRatio,
@@ -209,6 +402,17 @@ export function calculateStrategyBacktest({
       count: funding.count,
       averageFundingRate: funding.averageFundingRate,
       annualizedFundingPct: funding.annualizedFundingPct,
+      positiveCount: funding.positiveCount,
+      negativeCount: funding.negativeCount,
+    },
+    earn: {
+      source: sortedEarnRates.length > 0 ? earnHistorySource : "manual",
+      productId: earnProductId,
+      records: sortedEarnRates.length,
+      averageApr: averageEarnApr,
+      fallbackApr: earnApr,
+      latestApr: sortedEarnRates.at(-1)?.annualPercentageRate ?? earnApr,
+      error: sortedEarnRates.length > 0 ? null : earnHistoryError,
     },
     results: {
       earnOnly: pnlToResult({ pnl: earnOnlyPnl, principal, days: actualDays }),
@@ -221,21 +425,29 @@ export function calculateStrategyBacktest({
 
 export async function runStrategyBacktest(params) {
   const symbol = String(params.symbol ?? "TRXUSDT").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const requestedDays = clamp(Math.round(toNumber(params.days, 30)), 1, 180);
+  const now = Date.now();
+  const requestedDays = clamp(Math.round(toNumber(params.days, 30)), 1, MAX_BACKTEST_DAYS);
+  const parsedStartTime = Number(params.startTime);
+  const parsedEndTime = Number(params.endTime);
+  const hasDateRange = Number.isFinite(parsedStartTime) && Number.isFinite(parsedEndTime) && parsedEndTime > parsedStartTime;
+  const endTime = hasDateRange ? parsedEndTime : now;
+  const startTime = hasDateRange ? parsedStartTime : endTime - requestedDays * DAY_MS;
+  const boundedStartTime = Math.max(startTime, endTime - MAX_BACKTEST_DAYS * DAY_MS);
+  const actualRequestedDays = Math.max(Math.round((endTime - boundedStartTime) / DAY_MS), 1);
   const principal = Math.max(toNumber(params.principal, 10000), 1);
   const earnApr = normalizeRate(params.earnApr ?? 0.12);
   const hedgeRatio = clamp(normalizeRate(params.hedgeRatio ?? 1), 0, 2);
   const spotFeeRate = Math.max(toNumber(params.spotFeeBps, 10), 0) / 10000;
   const futuresFeeRate = Math.max(toNumber(params.futuresFeeBps, 5), 0) / 10000;
   const slippageRate = Math.max(toNumber(params.slippageBps, 2), 0) / 10000;
-  const interval = requestedDays <= 7 ? "1h" : "1d";
-  const endTime = Date.now();
-  const startTime = endTime - requestedDays * DAY_MS;
+  const interval = actualRequestedDays <= 7 ? "1h" : "1d";
+  const asset = symbol.endsWith("USDT") ? symbol.slice(0, -4) : symbol;
 
-  const [spotKlines, futuresKlines, fundingRates] = await Promise.all([
-    fetchKlines({ market: "spot", symbol, startTime, endTime, interval }),
-    fetchKlines({ market: "futures", symbol, startTime, endTime, interval }),
-    fetchFundingRates({ symbol, startTime, endTime }),
+  const [spotKlines, futuresKlines, fundingRates, earnHistory] = await Promise.all([
+    getCached(`spot:${symbol}:${boundedStartTime}:${endTime}:${interval}`, () => fetchKlines({ market: "spot", symbol, startTime: boundedStartTime, endTime, interval })),
+    getCached(`futures:${symbol}:${boundedStartTime}:${endTime}:${interval}`, () => fetchKlines({ market: "futures", symbol, startTime: boundedStartTime, endTime, interval })),
+    getCached(`funding:${symbol}:${boundedStartTime}:${endTime}`, () => fetchFundingRates({ symbol, startTime: boundedStartTime, endTime })),
+    getCached(`earn:${asset}:${boundedStartTime}:${endTime}`, () => fetchEarnRateHistory({ asset, startTime: boundedStartTime, endTime })),
   ]);
 
   if (spotKlines.length < 2 || futuresKlines.length < 2) {
@@ -244,9 +456,15 @@ export async function runStrategyBacktest(params) {
 
   return calculateStrategyBacktest({
     symbol,
-    requestedDays,
+    requestedDays: actualRequestedDays,
+    startTime: boundedStartTime,
+    endTime,
     principal,
     earnApr,
+    earnRateHistory: earnHistory.rows,
+    earnHistorySource: earnHistory.source,
+    earnProductId: earnHistory.productId,
+    earnHistoryError: earnHistory.error,
     hedgeRatio,
     spotFeeRate,
     futuresFeeRate,

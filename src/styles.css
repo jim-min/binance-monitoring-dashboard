@@ -1561,6 +1561,22 @@ tbody tr:hover {
   font-style: normal;
 }
 
+.strategy-date-range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.strategy-field input[type="date"] {
+  color-scheme: dark;
+}
+
+.strategy-field input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(1) sepia(1) saturate(4) hue-rotate(350deg);
+  opacity: 0.86;
+}
+
 .strategy-note {
   display: flex;
   gap: 9px;
@@ -1713,6 +1729,39 @@ tbody tr:hover {
   display: block;
   margin-top: 8px;
   font-size: 18px;
+}
+
+.history-source-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-source-grid div {
+  min-height: 74px;
+  padding: 12px;
+  background: #11161c;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.history-source-grid small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.history-source-grid strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.strategy-source-note {
+  margin: 12px 0 0;
+  color: var(--yellow-2);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .timeline-legend {
@@ -2021,6 +2070,7 @@ progress::-webkit-progress-value {
   .strategy-lab-grid,
   .strategy-results-grid,
   .strategy-detail-grid,
+  .history-source-grid,
   .hero-band {
     grid-template-columns: 1fr;
   }
@@ -2061,6 +2111,8 @@ progress::-webkit-progress-value {
   .arb-summary-grid,
   .earn-summary-grid,
   .market-breakdown,
+  .strategy-date-range,
+  .history-source-grid,
   .nav {
     grid-template-columns: 1fr;
   }
