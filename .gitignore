@@ -24,6 +24,7 @@ vite.config.d.ts
 *.sqlite
 *.sqlite3
 .alert-state.json
+docs/presentation/
 
 # Logs
 *.log

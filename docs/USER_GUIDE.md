@@ -19,27 +19,62 @@
 
 프로젝트 루트에서 의존성을 설치합니다.
 
-```bash
+```powershell
 npm install
 ```
 
-API 서버를 실행합니다.
+### 권장 실행 방식
 
-```bash
-npm run server:dev
-```
+내가 로컬에서 서버들을 띄울 때 쓰는 방식과 동일하게 실행하려면 아래 스크립트를 사용합니다. 이 스크립트는 API 서버와 Vite 프론트엔드 서버를 숨김 프로세스로 각각 실행하고, 로그를 `local-services/logs/` 아래에 남깁니다.
 
-프론트엔드 개발 서버를 실행합니다.
-
-```bash
-npm run dev
+```powershell
+.\local-services\start-dashboard-dev.cmd
 ```
 
 브라우저에서 아래 주소로 접속합니다.
 
 ```text
-http://127.0.0.1:5173
+http://127.0.0.1:5173/
 ```
+
+API 상태 확인:
+
+```text
+http://127.0.0.1:8787/api/health
+http://127.0.0.1:8787/api/config/status
+```
+
+### 터미널을 직접 열어 실행하는 방식
+
+터미널을 직접 보고 싶다면 PowerShell 창을 2개 열고 프로젝트 루트에서 각각 실행합니다.
+
+첫 번째 터미널:
+
+```powershell
+npm.cmd run server:dev
+```
+
+두 번째 터미널:
+
+```powershell
+npm.cmd run dev
+```
+
+Windows PowerShell에서 `npm run dev`가 정책 문제나 실행 파일 해석 문제로 잘 동작하지 않으면 `npm.cmd run dev`처럼 `npm.cmd`를 직접 호출합니다.
+
+`npm run dev`는 프론트엔드만 실행합니다. 이 프로젝트의 실제 데이터 화면은 로컬 API 서버도 필요하므로 `server:dev`가 같이 떠 있어야 합니다.
+
+### 부팅 자동 실행
+
+컴퓨터가 켜질 때 자동으로 실행되는 항목은 텔레그램 뉴스 모니터만 담당합니다.
+
+자동 실행 바로가기:
+
+```text
+C:\Users\jimin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Binance Monitoring Stack.lnk
+```
+
+이 자동 실행은 `local-services/start-binance-stack.cmd`를 호출하며, Binance API 서버와 프론트엔드는 자동으로 띄우지 않습니다. 대시보드를 보고 싶을 때만 위의 `start-dashboard-dev.cmd` 또는 수동 터미널 방식으로 실행합니다.
 
 ## 3. .env 설정
 

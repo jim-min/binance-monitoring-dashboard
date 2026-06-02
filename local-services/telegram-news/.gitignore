@@ -1,0 +1,8 @@
+﻿.env
+sessions/
+*.log
+*.pid
+stdout.log
+stderr.log
+__pycache__/
+*.py[cod]

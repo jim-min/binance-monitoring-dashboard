@@ -111,25 +111,26 @@ MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. �
 
 자동 주문 실행은 MVP 범위에서 제외합니다. 먼저 데이터 수집, 분석, 알림 중심으로 안정적인 모니터링 도구를 만드는 것을 우선합니다.
 
-## 로컬 UI 실행
+## 로컬 실행
 
 현재 UI는 Vite + React + TypeScript 기반으로 구성되어 있습니다.
 
 ```powershell
 npm install
-npm run dev
 ```
+
+권장 실행 방식:
+
+```powershell
+.\local-services\start-dashboard-dev.cmd
+```
+
+이 스크립트는 내가 로컬에서 서버를 띄울 때와 동일하게 API 서버와 Vite 프론트엔드 서버를 숨김 프로세스로 실행합니다.
 
 브라우저에서 접속:
 
 ```text
-http://127.0.0.1:5173
-```
-
-로컬 API 서버 실행:
-
-```powershell
-npm run server:dev
+http://127.0.0.1:5173/
 ```
 
 API 상태 확인:
@@ -137,6 +138,30 @@ API 상태 확인:
 ```text
 http://127.0.0.1:8787/api/health
 http://127.0.0.1:8787/api/config/status
+```
+
+터미널을 직접 보고 싶다면 PowerShell 창을 2개 열고 프로젝트 루트에서 각각 실행합니다.
+
+첫 번째 터미널:
+
+```powershell
+npm.cmd run server:dev
+```
+
+두 번째 터미널:
+
+```powershell
+npm.cmd run dev
+```
+
+`npm run dev`는 프론트엔드만 실행합니다. 잔고, Simple Earn, 공지, Telegram 알림, 헤지 백테스트 같은 실제 데이터 화면은 로컬 API 서버가 같이 떠 있어야 정상 동작합니다.
+
+컴퓨터 부팅 시 자동 실행은 텔레그램 뉴스 모니터만 담당합니다. Binance API 서버와 프론트엔드는 대시보드를 볼 때만 수동으로 실행합니다.
+
+로그 위치:
+
+```text
+local-services/logs/
 ```
 
 Telegram 테스트 전송:
