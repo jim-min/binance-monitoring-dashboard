@@ -185,10 +185,13 @@ async function fetchEarnRateHistory({ asset, startTime, endTime }) {
   }
 }
 
-const pnlToResult = ({ pnl, principal, days }) => ({
+const pnlToResult = ({ pnl, principal, totalRequiredCapital, grossNotional, days }) => ({
   pnl,
   periodReturnPct: principal > 0 ? pnl / principal : 0,
   annualizedApr: principal > 0 ? (pnl / principal) * (365 / days) : 0,
+  capitalReturnPct: totalRequiredCapital > 0 ? pnl / totalRequiredCapital : 0,
+  capitalAnnualizedApr: totalRequiredCapital > 0 ? (pnl / totalRequiredCapital) * (365 / days) : 0,
+  grossReturnPct: grossNotional > 0 ? pnl / grossNotional : 0,
 });
 
 const nearestCandle = (klines, time) => {
@@ -258,7 +261,7 @@ export function calculateStrategyBacktest({
   earnHistorySource = "manual",
   earnProductId = null,
   earnHistoryError = null,
-  hedgeRatio = 1,
+  futuresLeverage = 1,
   spotFeeRate = 0.001,
   futuresFeeRate = 0.0005,
   slippageRate = 0.0002,
@@ -277,7 +280,11 @@ export function calculateStrategyBacktest({
   const lastFutures = futuresKlines[futuresKlines.length - 1];
   const actualDays = Math.max((lastSpot.closeTime - firstSpot.openTime) / DAY_MS, 1);
   const spotQty = principal / firstSpot.close;
-  const shortNotional = principal * hedgeRatio;
+  const hedgeRatio = 1;
+  const shortNotional = principal;
+  const futuresMargin = futuresLeverage > 0 ? shortNotional / futuresLeverage : shortNotional;
+  const totalRequiredCapital = principal + futuresMargin;
+  const grossNotional = principal + shortNotional;
   const futuresQty = firstFutures.close > 0 ? shortNotional / firstFutures.close : 0;
   const exitSpotValue = spotQty * lastSpot.close;
   const exitFuturesNotional = futuresQty * lastFutures.close;
@@ -375,6 +382,11 @@ export function calculateStrategyBacktest({
       principal,
       earnApr,
       hedgeRatio,
+      futuresLeverage,
+      shortNotional,
+      futuresMargin,
+      totalRequiredCapital,
+      grossNotional,
       spotFeeBps: spotFeeRate * 10000,
       futuresFeeBps: futuresFeeRate * 10000,
       slippageBps: slippageRate * 10000,
@@ -415,9 +427,27 @@ export function calculateStrategyBacktest({
       error: sortedEarnRates.length > 0 ? null : earnHistoryError,
     },
     results: {
-      earnOnly: pnlToResult({ pnl: earnOnlyPnl, principal, days: actualDays }),
-      shortOnly: pnlToResult({ pnl: shortOnlyPnl, principal, days: actualDays }),
-      earnPlusShort: pnlToResult({ pnl: combinedPnl, principal, days: actualDays }),
+      earnOnly: pnlToResult({
+        pnl: earnOnlyPnl,
+        principal,
+        totalRequiredCapital: principal,
+        grossNotional: principal,
+        days: actualDays,
+      }),
+      shortOnly: pnlToResult({
+        pnl: shortOnlyPnl,
+        principal: futuresMargin,
+        totalRequiredCapital: futuresMargin,
+        grossNotional: shortNotional,
+        days: actualDays,
+      }),
+      earnPlusShort: pnlToResult({
+        pnl: combinedPnl,
+        principal,
+        totalRequiredCapital,
+        grossNotional,
+        days: actualDays,
+      }),
     },
     series,
   };
@@ -436,7 +466,7 @@ export async function runStrategyBacktest(params) {
   const actualRequestedDays = Math.max(Math.round((endTime - boundedStartTime) / DAY_MS), 1);
   const principal = Math.max(toNumber(params.principal, 10000), 1);
   const earnApr = normalizeRate(params.earnApr ?? 0.12);
-  const hedgeRatio = clamp(normalizeRate(params.hedgeRatio ?? 1), 0, 2);
+  const futuresLeverage = clamp(toNumber(params.futuresLeverage, 1), 1, 20);
   const spotFeeRate = Math.max(toNumber(params.spotFeeBps, 10), 0) / 10000;
   const futuresFeeRate = Math.max(toNumber(params.futuresFeeBps, 5), 0) / 10000;
   const slippageRate = Math.max(toNumber(params.slippageBps, 2), 0) / 10000;
@@ -465,7 +495,7 @@ export async function runStrategyBacktest(params) {
     earnHistorySource: earnHistory.source,
     earnProductId: earnHistory.productId,
     earnHistoryError: earnHistory.error,
-    hedgeRatio,
+    futuresLeverage,
     spotFeeRate,
     futuresFeeRate,
     slippageRate,

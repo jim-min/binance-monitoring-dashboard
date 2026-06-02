@@ -26,7 +26,7 @@ test("calculateStrategyBacktest combines earn, short, funding, fee, and slippage
     requestedDays: 2,
     principal: 1000,
     earnApr: 0.365,
-    hedgeRatio: 1,
+    futuresLeverage: 2,
     spotFeeRate: 0.001,
     futuresFeeRate: 0.0005,
     slippageRate: 0,
@@ -44,6 +44,10 @@ test("calculateStrategyBacktest combines earn, short, funding, fee, and slippage
   assert.equal(result.assumptions.actualDays, 2);
   assertAlmostEqual(result.market.spotMovePct, 0.2);
   assert.equal(result.funding.count, 2);
+  assert.equal(result.assumptions.shortNotional, 1000);
+  assert.equal(result.assumptions.futuresMargin, 500);
+  assert.equal(result.assumptions.totalRequiredCapital, 1500);
+  assert.equal(result.assumptions.grossNotional, 2000);
   assertAlmostEqual(result.components.earnPnl, 2.4);
   assert.equal(result.components.spotPricePnl, 200);
   assert.equal(result.components.shortPricePnl, 100);
@@ -51,6 +55,9 @@ test("calculateStrategyBacktest combines earn, short, funding, fee, and slippage
   assert.equal(result.components.spotFees, 2.2);
   assert.equal(result.components.futuresFees, 0.95);
   assertAlmostEqual(result.results.earnPlusShort.pnl, 299.17);
+  assertAlmostEqual(result.results.earnPlusShort.periodReturnPct, 0.29917);
+  assertAlmostEqual(result.results.earnPlusShort.capitalReturnPct, 299.17 / 1500);
+  assertAlmostEqual(result.results.earnPlusShort.grossReturnPct, 299.17 / 2000);
   assert.equal(result.series.length, 2);
 });
 
@@ -60,7 +67,6 @@ test("calculateStrategyBacktest uses time-varying Earn APR history when availabl
     requestedDays: 2,
     principal: 1000,
     earnApr: 0.1,
-    hedgeRatio: 0,
     spotFeeRate: 0,
     futuresFeeRate: 0,
     slippageRate: 0,

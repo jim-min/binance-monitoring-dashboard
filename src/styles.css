@@ -771,6 +771,31 @@ button {
   gap: 8px;
 }
 
+.portfolio-balance-title {
+  display: grid;
+  gap: 4px;
+  padding: 4px 2px 2px;
+}
+
+.portfolio-balance-title strong {
+  font-size: 13px;
+}
+
+.portfolio-balance-title small,
+.portfolio-earn-receipt-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.portfolio-earn-receipt-note {
+  padding: 10px 11px;
+  color: var(--yellow-2);
+  background: rgba(240, 185, 11, 0.06);
+  border: 1px solid rgba(240, 185, 11, 0.16);
+  border-radius: var(--radius);
+}
+
 .portfolio-balance-row {
   display: flex;
   justify-content: space-between;

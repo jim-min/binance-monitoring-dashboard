@@ -9,7 +9,7 @@ export type StrategyBacktestParams = {
   startDate: string;
   endDate: string;
   earnAprPct: number;
-  hedgeRatioPct: number;
+  futuresLeverage: number;
   spotFeeBps: number;
   futuresFeeBps: number;
   slippageBps: number;
@@ -29,7 +29,7 @@ export function useStrategyBacktest(params: StrategyBacktestParams) {
       startTime: String(startTime),
       endTime: String(endTime),
       earnApr: String(params.earnAprPct / 100),
-      hedgeRatio: String(params.hedgeRatioPct / 100),
+      futuresLeverage: String(params.futuresLeverage),
       spotFeeBps: String(params.spotFeeBps),
       futuresFeeBps: String(params.futuresFeeBps),
       slippageBps: String(params.slippageBps),
@@ -38,8 +38,8 @@ export function useStrategyBacktest(params: StrategyBacktestParams) {
   }, [
     params.earnAprPct,
     params.endDate,
+    params.futuresLeverage,
     params.futuresFeeBps,
-    params.hedgeRatioPct,
     params.principal,
     params.slippageBps,
     params.spotFeeBps,

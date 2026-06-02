@@ -73,6 +73,9 @@ export type StrategyResult = {
   pnl: number;
   periodReturnPct: number;
   annualizedApr: number;
+  capitalReturnPct: number;
+  capitalAnnualizedApr: number;
+  grossReturnPct: number;
 };
 
 export type StrategyBacktestPoint = {
@@ -98,6 +101,11 @@ export type StrategyBacktest = {
     principal: number;
     earnApr: number;
     hedgeRatio: number;
+    futuresLeverage: number;
+    shortNotional: number;
+    futuresMargin: number;
+    totalRequiredCapital: number;
+    grossNotional: number;
     spotFeeBps: number;
     futuresFeeBps: number;
     slippageBps: number;

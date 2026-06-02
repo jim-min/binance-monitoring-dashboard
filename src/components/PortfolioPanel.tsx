@@ -14,7 +14,8 @@ const formatAmount = (value: number) => new Intl.NumberFormat("en-US", {
 
 export function PortfolioPanel() {
   const { portfolio, isLoading, error, lastUpdatedAt } = useAccountPortfolio();
-  const balances = portfolio?.balances.slice(0, 6) ?? [];
+  const earnReceiptBalances = portfolio?.balances.filter((balance) => balance.asset.startsWith("LD")) ?? [];
+  const balances = portfolio?.balances.filter((balance) => !balance.asset.startsWith("LD")).slice(0, 6) ?? [];
 
   return (
     <section className="panel portfolio-panel">
@@ -47,7 +48,16 @@ export function PortfolioPanel() {
       </div>
 
       <div className="portfolio-balance-list">
-        {balances.length === 0 && !error ? <div className="empty-alert">표시할 Spot 잔고가 없습니다.</div> : null}
+        <div className="portfolio-balance-title">
+          <strong>Spot 지갑 직접 잔고</strong>
+          <small>Simple Earn 예치분은 위 Earn 평가액에 합산됩니다.</small>
+        </div>
+        {earnReceiptBalances.length > 0 ? (
+          <div className="portfolio-earn-receipt-note">
+            LDUSDT/LDUSDC 같은 Earn receipt token {earnReceiptBalances.length}개는 중복 계산을 피하기 위해 Spot 목록에서 제외했습니다.
+          </div>
+        ) : null}
+        {balances.length === 0 && !error ? <div className="empty-alert">표시할 Spot 직접 잔고가 없습니다.</div> : null}
         {balances.map((balance) => (
           <article className="portfolio-balance-row" key={balance.asset}>
             <div>

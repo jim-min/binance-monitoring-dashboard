@@ -103,6 +103,8 @@ function ResultCard({
   result?: StrategyResult;
 }) {
   const pnl = result?.pnl ?? 0;
+  const capitalReturnPct = result?.capitalReturnPct ?? result?.periodReturnPct ?? 0;
+  const capitalAnnualizedApr = result?.capitalAnnualizedApr ?? result?.annualizedApr ?? 0;
 
   return (
     <article className={`strategy-result-card ${pnl >= 0 ? "positive" : "negative"}`}>
@@ -114,8 +116,8 @@ function ResultCard({
         </div>
       </div>
       <div className="strategy-result-value">
-        <strong>{formatPct(result?.annualizedApr ?? 0)}</strong>
-        <span>{formatUsd(pnl)} / 기간 수익률 {formatPct(result?.periodReturnPct ?? 0)}</span>
+        <strong>{formatPct(capitalReturnPct)}</strong>
+        <span>{formatUsd(pnl)} / Earn 원금 기준 {formatPct(result?.periodReturnPct ?? 0)} · 연율 {formatPct(capitalAnnualizedApr)}</span>
       </div>
     </article>
   );
@@ -165,7 +167,7 @@ export function HedgePage() {
   const [startDate, setStartDate] = useState(daysAgoDateValue(30));
   const [endDate, setEndDate] = useState(todayDateValue());
   const [earnAprPct, setEarnAprPct] = useState(18.6);
-  const [hedgeRatioPct, setHedgeRatioPct] = useState(100);
+  const [futuresLeverage, setFuturesLeverage] = useState(1);
   const [spotFeeBps, setSpotFeeBps] = useState(10);
   const [futuresFeeBps, setFuturesFeeBps] = useState(5);
   const [slippageBps, setSlippageBps] = useState(2);
@@ -187,7 +189,7 @@ export function HedgePage() {
     startDate,
     endDate,
     earnAprPct,
-    hedgeRatioPct,
+    futuresLeverage,
     spotFeeBps,
     futuresFeeBps,
     slippageBps,
@@ -220,6 +222,12 @@ export function HedgePage() {
       costRisk: Math.round(costRisk),
     };
   }, [data, futuresFeeBps, slippageBps, spotFeeBps]);
+  const principalAmount = data?.assumptions.principal ?? principal;
+  const displayLeverage = data?.assumptions.futuresLeverage ?? futuresLeverage;
+  const shortNotional = data?.assumptions.shortNotional ?? principalAmount;
+  const futuresMargin = data?.assumptions.futuresMargin ?? (displayLeverage > 0 ? shortNotional / displayLeverage : shortNotional);
+  const totalRequiredCapital = data?.assumptions.totalRequiredCapital ?? principalAmount + futuresMargin;
+  const grossNotional = data?.assumptions.grossNotional ?? principalAmount + shortNotional;
 
   return (
     <section className="panel page-panel">
@@ -261,7 +269,7 @@ export function HedgePage() {
             <DateField label="종료일" value={endDate} max={todayDateValue()} onChange={setEndDate} />
           </div>
           <NumericField label="Fallback Earn APR" value={earnAprPct} min={0} step={0.1} suffix="%" onChange={setEarnAprPct} />
-          <NumericField label="숏 헤지 비율" value={hedgeRatioPct} min={0} max={200} step={5} suffix="%" onChange={setHedgeRatioPct} />
+          <NumericField label="숏 레버리지" value={futuresLeverage} min={1} max={20} step={0.5} suffix="x" onChange={setFuturesLeverage} />
           <NumericField label="Spot 수수료" value={spotFeeBps} min={0} step={1} suffix="bps" onChange={setSpotFeeBps} />
           <NumericField label="Futures 수수료" value={futuresFeeBps} min={0} step={1} suffix="bps" onChange={setFuturesFeeBps} />
           <NumericField label="슬리피지" value={slippageBps} min={0} step={1} suffix="bps" onChange={setSlippageBps} />
@@ -335,6 +343,30 @@ export function HedgePage() {
                 <div>
                   <small>APR 히스토리</small>
                   <strong>{data?.earn.records ?? 0}개</strong>
+                </div>
+                <div>
+                  <small>Spot 투자금</small>
+                  <strong>{formatUsd(principalAmount)}</strong>
+                </div>
+                <div>
+                  <small>Short 명목가</small>
+                  <strong>{formatUsd(shortNotional)}</strong>
+                </div>
+                <div>
+                  <small>Short 필요 증거금</small>
+                  <strong>{formatUsd(futuresMargin)}</strong>
+                </div>
+                <div>
+                  <small>총 필요 자본</small>
+                  <strong>{formatUsd(totalRequiredCapital)}</strong>
+                </div>
+                <div>
+                  <small>총 명목 노출</small>
+                  <strong>{formatUsd(grossNotional)}</strong>
+                </div>
+                <div>
+                  <small>레버리지</small>
+                  <strong>{formatNumber(displayLeverage, 2)}x</strong>
                 </div>
               </div>
             </article>
