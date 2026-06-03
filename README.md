@@ -1,119 +1,136 @@
 # Binance Monitoring Dashboard
 
-Binance Monitoring Dashboard는 바이낸스의 실시간 시장 데이터, Simple Earn 상품, Futures 펀딩비, 스테이킹+숏 헤지 전략, arbitrage 가능성을 한 곳에서 모니터링하기 위한 개인용 대시보드 프로젝트입니다.
+Binance Monitoring Dashboard는 Binance의 시장 가격, Simple Earn 상품, Earn 이벤트 공지, Futures 펀딩비, 헤지 전략, arbitrage 기회를 한 곳에서 확인하는 로컬 대시보드입니다.
 
-현재 단계에서는 로컬 개인용 MVP를 구현 중입니다. Vite React 프론트엔드와 Node 로컬 API 서버로 구성되어 있으며, 사용자는 GitHub에서 프로젝트를 clone한 뒤 자신의 `.env`를 설정해 실행하는 방식을 기본으로 합니다.
+프론트엔드는 React + Vite + TypeScript로 구성되어 있고, 백엔드는 Node.js 로컬 API 서버로 Binance REST API, WebSocket, CMS 공지 데이터를 수집합니다. Telegram Bot을 통해 APR 이벤트 알림도 받을 수 있습니다.
 
-## 목표
+## 주요 기능
 
-- BTC, ETH, SOL, BNB, TRX, XRP 등 주요 코인의 현재가를 실시간으로 확인합니다.
-- Binance Simple Earn Flexible 상품을 APR, 구독 가능 여부, 이벤트 여부 기준으로 정리합니다.
-- Simple Earn 관련 Binance 공지를 함께 보여주어 이벤트성 APR을 빠르게 파악합니다.
-- 고APR Earn 상품에 대해 Futures 숏 포지션을 결합했을 때 예상 순수익과 리스크를 계산합니다.
-- Spot, Futures, 여러 페어 간 arbitrage 후보를 감지하고 알림을 받을 수 있게 합니다.
-- Binance Spot 잔고와 Simple Earn 계정 요약을 확인합니다.
+- 주요 코인 실시간 가격 모니터링
+- Binance Spot 및 Simple Earn 잔고 요약
+- Simple Earn Flexible/Locked 상품 수집, 검색, 정렬
+- Binance Earn 이벤트 공지 수집 및 APR 이벤트 분류
+- APR 이벤트 Telegram 알림 및 앱 내부 알림 표시
+- Simple Earn + Futures 숏 헤지 전략 백테스트
+- Spot/Futures 가격, Funding Fee, Earn APR 히스토리 기반 전략 계산
+- Binance 내부 arbitrage 기회 모니터링
+- 한국어 UI
 
-## 핵심 화면
+## 화면 구성
 
 ### Market Watch
 
-주요 코인의 실시간 가격, 24시간 등락률, 거래량, 호가, 미니 차트를 보여주는 화면입니다.
+주요 코인의 실시간 가격, 24시간 등락률, 거래량, 고가/저가, 스프레드 추정값을 표시합니다.
+
+데이터는 Binance Spot WebSocket ticker stream을 기반으로 갱신합니다.
 
 ### Portfolio
 
-Binance 읽기 전용 API key를 사용해 Spot 계정 잔고와 Simple Earn 계정 요약을 표시합니다. Spot 자산은 Binance ticker price 기준으로 USDT 평가액을 근사 계산하고, Simple Earn은 Binance Simple Earn account summary의 USDT 값을 사용합니다.
+Binance 읽기 전용 API key를 사용해 Spot 계정 잔고와 Simple Earn 계정 요약을 표시합니다.
 
-현재 표시 항목:
+표시 항목:
 
 - Spot 추정 평가액
 - Simple Earn 전체 평가액
 - Flexible Earn 평가액
 - Locked Earn 평가액
 - 상위 Spot 보유 자산
+- Binance 계정 상태
 
-Futures 포지션, Cross/Isolated Margin, Funding 미수금, 전체 통합 계정 평가는 후속 구현 항목입니다.
+Spot 자산의 USDT 평가는 `ASSETUSDT` 가격을 우선 사용합니다. 해당 가격이 없으면 `ASSETBTC`와 `BTCUSDT`를 조합해 추정합니다. `LDUSDT`, `LDUSDC` 같은 Earn receipt token은 Simple Earn 평가액과 중복되지 않도록 Spot 목록에서 제외합니다.
 
 ### Simple Earn Screener
 
-Simple Earn Flexible/Locked 상품을 APR, 한도, 구독 가능 여부, 관련 이벤트 기준으로 필터링하고 정렬하는 화면입니다. Binance signed Simple Earn API를 페이지네이션으로 호출해 가능한 상품을 수집합니다.
+Binance Simple Earn 상품을 수집해 APR, 상품 유형, 구독 가능 여부, 한도, 이벤트 연관성 기준으로 확인할 수 있습니다.
+
+사용 API:
+
+- `/sapi/v1/simple-earn/flexible/list`
+- `/sapi/v1/simple-earn/locked/list`
+
+Flexible 상품과 Locked 상품을 함께 보여주며, 상품 수가 많아도 검색과 정렬로 원하는 코인을 빠르게 찾을 수 있습니다.
 
 ### Earn Events
 
-Binance Latest Activities 공지 페이지의 이벤트를 수집하고, 관련 코인 및 상품과 연결해서 보여주는 영역입니다.
+Binance Support의 Latest Activities 공지를 가져와 Earn 이벤트를 표시합니다.
 
-대상 공지:
+대상 페이지:
 
 - https://www.binance.com/en/support/announcement/list/93
 
-현재 구현은 Binance CMS JSON endpoint를 통해 공지 목록을 가져오고, 최신 일부 공지는 상세 본문까지 가져와 토큰, 페어, APR/APY 문구, 보상 문구, 캠페인 기간 후보를 파싱합니다. Binance CMS가 허용하는 pageSize 값만 쓰도록 서버에서 정규화하고, 상세 본문 조회 실패 시 제목 기반 파싱으로 fallback합니다.
+서버는 Binance CMS JSON endpoint에서 공지 목록을 가져오고, 상세 본문에서 토큰, 페어, APR/APY 문구, 보상 문구, 캠페인 기간을 파싱합니다. 상세 본문 조회가 실패하면 제목 기반 파싱으로 처리합니다.
 
-Telegram 알림은 전체 이벤트가 아니라 APR/APY/Simple Earn/Flexible/Locked/Staking 계열 이벤트만 대상으로 합니다. 이미 보낸 공지 코드는 로컬 `.alert-state.json`에 저장하며, 이 파일은 git에 커밋하지 않습니다.
+Telegram 알림은 전체 공지가 아니라 APR/APY/Simple Earn/Flexible/Locked/Staking 계열 이벤트만 대상으로 합니다. 이미 보낸 공지 코드는 로컬 `.alert-state.json`에 저장해 중복 발송을 막습니다.
 
 ### Hedge Strategy Lab
 
-Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포지션으로 헤지하는 전략을 시뮬레이션합니다.
+Simple Earn으로 코인을 보유하고 동일 코인을 Futures에서 숏 포지션으로 헤지하는 전략을 계산합니다.
 
-현재 후보 코인은 `Simple Earn에 존재` + `USDT-M Perpetual Futures 상장` + `Spot USDT 거래 가능` 조건의 교집합으로 생성합니다. 검색형 드롭다운에서 코인명 또는 심볼로 빠르게 찾을 수 있습니다.
+대상 코인은 아래 조건을 모두 만족하는 자산입니다.
 
-주요 계산 항목:
+- Simple Earn 상품 존재
+- Binance Spot USDT 마켓 존재
+- Binance USDT-M Perpetual Futures 마켓 존재
 
-- Simple Earn APR
-- Futures 펀딩비
-- 현물-선물 베이시스
-- 거래 수수료
-- 슬리피지
-- 예상 순 APR
-- 과거 가격 기반 백테스트
+계산에 사용하는 데이터:
 
-청산 가격, 필요 증거금, 레버리지별 마진 리스크는 후속 구현 항목입니다.
+- Spot 가격 히스토리
+- Futures 가격 히스토리
+- Futures Funding Fee History
+- Simple Earn APR 히스토리
+- 수수료 입력값
+- 슬리피지 입력값
+- 숏 레버리지 입력값
+
+표시 전략:
+
+- `Earn Only`: 현물 보유 + Earn 수익
+- `Short Only`: Futures 숏 포지션
+- `Earn + Short`: 현물 Earn + Futures 숏 헤지
+
+수익률은 기간 수익률, 필요 자본 기준 수익률, 연환산 수익률을 구분해 표시합니다. `Earn + Short` 전략에서는 Spot 투자금과 Short 명목가를 동일하게 유지하고, 레버리지는 Futures 증거금 계산에 반영합니다.
 
 ### Arbitrage Monitor
 
-다양한 페어와 Spot-Futures 가격 차이를 모니터링합니다. 설정한 기준을 넘는 기회에 대한 Telegram 자동 알림은 후속 구현 항목입니다.
+Binance 내부의 Spot 삼각 차익과 Spot-Futures basis 기회를 모니터링합니다.
 
-초기 알림 채널 후보:
+Net 수익률은 gross 기회에서 거래 비용과 슬리피지 가정을 차감해 계산합니다. 가능 규모는 현재 최우선 호가 수량을 기준으로 보수적으로 추정합니다.
 
-- Telegram
+## 기술 스택
 
-MVP에서는 사용자가 이미 만들어둔 Telegram Bot을 활용합니다. 현재 APR 이벤트 알림은 구현되어 있으며, arbitrage 조건 충족 알림, Discord Webhook, Email, Browser Push는 후속 확장 후보입니다.
+### Frontend
 
-기존 봇:
+- React 19
+- TypeScript
+- Vite
+- Lucide React icons
+- CSS Modules 없이 전역 CSS 기반 스타일링
 
-- `@Tturu_news_bot`
+### Backend
 
-새 프로젝트에서는 기존 봇 프로그램에 직접 의존하지 않고, 같은 Bot API 방식으로 독립 Notification Worker를 구현합니다. `.env`에는 `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`를 설정합니다.
+- Node.js ESM
+- Node built-in HTTP server
+- Binance REST API
+- Binance WebSocket Stream
+- Binance CMS JSON endpoint
+- Telegram Bot API
 
-## 데이터 소스 후보
+### Local Runtime
 
-- Binance Spot WebSocket Streams
-- Binance Spot REST API
-- Binance USD-M Futures REST API
-- Binance Futures WebSocket Streams
-- Binance Simple Earn SAPI
-- Binance Support Announcement
+- PowerShell 실행 스크립트
+- `.env` 기반 로컬 설정
+- `.alert-state.json` 기반 Telegram 알림 중복 방지
+- `local-services/telegram-news` 기반 Telegram 뉴스 모니터
 
-공지 데이터는 WebSocket이 아니라 주기적 크롤링으로 수집합니다. APR 변동에 빠르게 대응하기 위해 Simple Earn Flexible 상품 데이터는 공지보다 짧은 주기로 갱신하고, 화면에서는 수동 새로고침을 제공합니다.
+### Test & Build
 
-## MVP 범위
-
-초기 MVP는 다음 기능을 목표로 합니다.
-
-- 주요 코인 실시간 가격 대시보드
-- Simple Earn Flexible/Locked 상품 스크리너
-- Binance CMS 기반 Earning Event 공지 연동
-- 고APR 상품의 Futures 마켓 존재 여부 확인
-- 펀딩비 기반 예상 순 APR 계산
-- Spot-Futures 베이시스 모니터링
-- Binance 내부 페어 중심 arbitrage 모니터링
-- 실제 계정 잔고 조회 연동
-- APR 이벤트 Telegram Bot 알림
-- 한국어 UI
-
-자동 주문 실행은 MVP 범위에서 제외합니다. 먼저 데이터 수집, 분석, 알림 중심으로 안정적인 모니터링 도구를 만드는 것을 우선합니다.
+- Node built-in test runner
+- TypeScript type check
+- Vite production build
 
 ## 로컬 실행
 
-현재 UI는 Vite + React + TypeScript 기반으로 구성되어 있습니다.
+프로젝트 루트에서 의존성을 설치합니다.
 
 ```powershell
 npm install
@@ -125,7 +142,7 @@ npm install
 .\local-services\start-dashboard-dev.cmd
 ```
 
-이 스크립트는 내가 로컬에서 서버를 띄울 때와 동일하게 API 서버와 Vite 프론트엔드 서버를 숨김 프로세스로 실행합니다.
+이 스크립트는 API 서버와 Vite 프론트엔드 서버를 숨김 프로세스로 실행합니다.
 
 브라우저에서 접속:
 
@@ -154,9 +171,9 @@ npm.cmd run server:dev
 npm.cmd run dev
 ```
 
-`npm run dev`는 프론트엔드만 실행합니다. 잔고, Simple Earn, 공지, Telegram 알림, 헤지 백테스트 같은 실제 데이터 화면은 로컬 API 서버가 같이 떠 있어야 정상 동작합니다.
+`npm run dev`는 프론트엔드만 실행합니다. 잔고, Simple Earn, 공지, Telegram 알림, 헤지 백테스트 화면은 로컬 API 서버가 같이 떠 있어야 정상 동작합니다.
 
-컴퓨터 부팅 시 자동 실행은 텔레그램 뉴스 모니터만 담당합니다. Binance API 서버와 프론트엔드는 대시보드를 볼 때만 수동으로 실행합니다.
+컴퓨터 부팅 시 자동 실행은 Telegram 뉴스 모니터만 담당합니다. Binance API 서버와 프론트엔드는 대시보드를 볼 때만 수동으로 실행합니다.
 
 로그 위치:
 
@@ -164,7 +181,25 @@ npm.cmd run dev
 local-services/logs/
 ```
 
-Telegram 테스트 전송:
+## 환경 변수
+
+프로젝트 루트에 `.env` 파일을 두고 아래 값을 설정합니다.
+
+```env
+BINANCE_API_KEY=
+BINANCE_API_SECRET=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+API_PORT=8787
+```
+
+`BINANCE_API_KEY`와 `BINANCE_API_SECRET`은 Simple Earn 데이터와 계정 잔고 요약을 가져오기 위해 사용합니다. Binance API key 권한은 읽기 전용으로 설정합니다.
+
+`TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`는 Telegram 알림 전송에 사용합니다.
+
+## Telegram 테스트
+
+API 서버가 실행 중일 때 아래 명령으로 테스트 메시지를 보낼 수 있습니다.
 
 ```powershell
 Invoke-RestMethod -Method Post `
@@ -173,71 +208,45 @@ Invoke-RestMethod -Method Post `
   -Body '{"message":"Binance Monitoring Dashboard test"}'
 ```
 
+사용 봇:
+
+```text
+@Tturu_news_bot
+```
+
+## 품질 확인
+
+테스트 실행:
+
+```powershell
+npm.cmd test
+```
+
 프로덕션 빌드 확인:
 
 ```powershell
 npm run build
 ```
 
-## 기술 스택 후보
+커밋 전에는 테스트, 빌드, git 상태를 확인합니다.
 
-### Frontend
-
-- Next.js 또는 React
-- TypeScript
-- Recharts 또는 Lightweight Charts
-- TanStack Query
-- WebSocket client
-
-### Backend
-
-- Python FastAPI 또는 Node.js NestJS
-- Background worker
-- Scheduler
-- Binance API client
-
-### Storage
-
-- SQLite for local MVP
-- PostgreSQL for deployed version
-- Redis for real-time cache and notification cooldown
-
-### UI
-
-- 한국어 단일 UI
-- 다국어 지원은 후속 확장
+```powershell
+npm.cmd test
+npm run build
+git status --short
+```
 
 ## 보안 원칙
 
 - API Key, API Secret, Telegram Bot Token, Telegram Chat ID는 로컬 `.env`에 저장합니다.
 - `.env`는 git에 커밋하지 않습니다.
 - API Secret은 클라이언트에 노출하지 않습니다.
-- 초기 버전에서는 읽기 전용 API Key만 사용합니다.
-- 출금 권한과 거래 권한은 기본적으로 비활성화합니다.
-- 실제 계정 잔고 조회는 허용하되 주문 실행 권한은 사용하지 않습니다.
+- Binance API key는 읽기 전용으로 사용합니다.
+- 출금 권한은 사용하지 않습니다.
+- 자동 주문 실행 권한은 사용하지 않습니다.
 - 로그에 API Key, Secret, 서명값을 남기지 않습니다.
 
-Secret Manager는 배포형 서비스나 팀 운영 단계에서 검토합니다. 로컬 개인용 MVP에서는 설정 부담이 적은 `.env` 방식을 기본으로 합니다.
-
 Telegram Bot Token은 비밀번호처럼 취급합니다. GitHub에 커밋하지 않고, 로그에도 남기지 않습니다.
-
-## 운영 방향
-
-초기에는 로컬 앱으로 개발하고 실행합니다.
-
-24시간 운영이 필요해지면 다음 순서로 확장합니다.
-
-1. 로컬 MVP 완성
-2. Telegram 알림 안정화
-3. Dockerfile 및 Docker Compose 추가
-4. 로컬 장시간 실행 테스트
-5. Amazon Lightsail, AWS EC2, 또는 작은 VPS에 배포
-
-24시간 운영 단계에서는 AWS EC2, Amazon Lightsail, 또는 작은 VPS에 앱을 띄우고, 개인 컴퓨터에서 서버의 대시보드에 접속하는 구조를 기본으로 합니다. 접근은 SSH 터널링, IP allowlist, Tailscale, Cloudflare Tunnel, 또는 로그인 인증으로 제한합니다.
-
-초기 서버 유지비는 작은 Linux 서버 1대 기준 월 5달러에서 20달러 사이를 1차 예산으로 봅니다. 비용 예측과 설정 단순성이 중요하면 Amazon Lightsail을 우선 검토하고, AWS 네트워크/IAM 구성을 세밀하게 다뤄야 하면 EC2를 검토합니다.
-
-AWS 서버에서 귀찮은 환경설정을 반복하지 않기 위해 Docker를 기본 배포 단위로 사용합니다. 서버에는 Docker와 Docker Compose만 준비하고, 앱은 `.env`와 compose 설정으로 실행하는 방향입니다.
 
 ## 리스크 고지
 
@@ -250,16 +259,3 @@ Simple Earn APR, Futures 펀딩비, 시장 가격, 유동성은 빠르게 변할
 - [요구 분석 문서](./REQUIREMENTS.md)
 - [UML 및 아키텍처 문서](./ARCHITECTURE.md)
 - [사용 설명서](./docs/USER_GUIDE.md)
-
-## 현재 상태
-
-- 주요 코인 실시간 가격 WebSocket 연동
-- Binance Spot/Simple Earn 잔고 요약 연동
-- Simple Earn Flexible/Locked 상품 수집 및 정렬
-- Binance CMS 기반 Earning Event 표시
-- APR 이벤트만 Telegram 및 앱 알림창에 반영
-- Earn + Futures 숏 전략 백테스트
-- Simple Earn + Spot + Futures 교집합 후보 검색
-- Binance 내부 arbitrage 후보 실시간 계산
-
-다음 주요 작업은 백그라운드 스케줄러, arbitrage Telegram 알림, 실제 계정 잔고 기반 계산, Docker 배포 파일 추가입니다.
