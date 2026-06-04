@@ -298,6 +298,8 @@ export function HedgePage() {
                 <strong>손익 구성</strong>
               </div>
               <ComponentRow label="Earn 이자 수익" value={data?.components.earnPnl ?? 0} tone="gain" />
+              <ComponentRow label="Base APR 수익" value={data?.components.baseEarnPnl ?? data?.components.earnPnl ?? 0} tone="gain" />
+              <ComponentRow label="Event Bonus APR 수익" value={data?.components.bonusEarnPnl ?? 0} tone="gain" />
               <ComponentRow label="현물 가격 손익" value={data?.components.spotPricePnl ?? 0} />
               <ComponentRow label="Futures 숏 가격 손익" value={data?.components.shortPricePnl ?? 0} />
               <ComponentRow label="펀딩비 손익" value={data?.components.fundingPnl ?? 0} />
@@ -337,8 +339,16 @@ export function HedgePage() {
                   <strong>{formatPct(data?.funding.averageFundingRate ?? 0, 4)}</strong>
                 </div>
                 <div>
-                  <small>평균 Earn APR</small>
+                  <small>평균 Effective APR</small>
                   <strong>{formatPct(data?.earn.averageApr ?? 0, 3)}</strong>
+                </div>
+                <div>
+                  <small>평균 Base APR</small>
+                  <strong>{formatPct(data?.earn.averageBaseApr ?? data?.earn.averageApr ?? 0, 3)}</strong>
+                </div>
+                <div>
+                  <small>평균 Bonus APR</small>
+                  <strong>{formatPct(data?.earn.averageBonusApr ?? 0, 3)}</strong>
                 </div>
                 <div>
                   <small>APR 히스토리</small>
@@ -393,6 +403,18 @@ export function HedgePage() {
               <div>
                 <small>Earn APR History</small>
                 <strong>{data?.earn.source === "history" ? `실제 히스토리 · ${data.earn.productId}` : "Fallback APR 사용"}</strong>
+              </div>
+              <div>
+                <small>Event Bonus</small>
+                <strong>{data?.earn.bonusEvents?.length ? `${data.earn.bonusEvents.length}개 이벤트 · ${formatNumber(data.earn.bonusAppliedDays ?? 0, 1)}일 적용` : "적용 이벤트 없음"}</strong>
+              </div>
+              <div>
+                <small>Bonus 적용 원금</small>
+                <strong>{data?.earn.bonusEligibleCapital ? `${formatUsd(data.earn.bonusEligibleCapital)} / 한도 ${formatUsd(data.earn.bonusCapCapital ?? 0)}` : "적용 원금 없음"}</strong>
+              </div>
+              <div>
+                <small>Bonus Tier</small>
+                <strong>{data?.earn.bonusCapitalTiers?.length ? data.earn.bonusCapitalTiers.map((tier) => `${formatUsd(tier.fromCapital)}-${formatUsd(tier.toCapital)} ${formatPct(tier.apr)}`).join(" / ") : "Tier 없음"}</strong>
               </div>
             </div>
             {data?.earn.error ? (

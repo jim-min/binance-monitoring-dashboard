@@ -5,6 +5,7 @@ const MAX_BACKTEST_DAYS = 365;
 const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 import { fetchFlexibleEarnProducts, signedBinanceRequest } from "./binance.mjs";
+import { fetchEarningEvents, isAprEvent, loadStoredEarnEventPeriods, parseEventPeriodText } from "./earningEvents.mjs";
 
 const toNumber = (value, fallback = 0) => {
   const number = Number(value);
@@ -117,6 +118,82 @@ async function fetchFlexibleEarnProduct(asset) {
     })[0] ?? null;
 }
 
+const parseTierRange = (range, rate) => {
+  const normalizedRange = String(range ?? "").replace(/\s+/g, "");
+  const match = normalizedRange.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)([A-Z0-9]+)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    range: String(range),
+    fromQty: toNumber(match[1]),
+    toQty: toNumber(match[2]),
+    asset: match[3].toUpperCase(),
+    apr: normalizeRate(rate),
+  };
+};
+
+const parseBonusTiers = (product, asset) => {
+  const tiers = product?.tierAnnualPercentageRate && typeof product.tierAnnualPercentageRate === "object"
+    ? Object.entries(product.tierAnnualPercentageRate)
+    : [];
+  const normalizedAsset = String(asset ?? "").toUpperCase();
+
+  return tiers
+    .map(([range, rate]) => parseTierRange(range, rate))
+    .filter((tier) => tier && tier.asset === normalizedAsset && tier.toQty > tier.fromQty && tier.apr > 0)
+    .sort((a, b) => a.fromQty - b.fromQty);
+};
+
+const safeFetchEarnBonusEvents = async (asset) => {
+  try {
+    return await getCached(`earn-bonus-events:${asset}`, () => fetchEarnBonusEvents(asset));
+  } catch {
+    return [];
+  }
+};
+
+const parseEventPeriod = (text) => {
+  return parseEventPeriodText(text);
+};
+
+async function fetchEarnBonusEvents(asset) {
+  const normalizedAsset = String(asset ?? "").toUpperCase();
+  const results = await Promise.allSettled(Array.from({ length: 10 }, (_, index) => fetchEarningEvents({
+    pageNo: String(index + 1),
+    pageSize: "20",
+    detailSize: "20",
+  })));
+
+  const fetched = results
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value)
+    .flatMap((result) => result.data.rows)
+    .filter(isAprEvent)
+    .filter((event) => event.assets?.some((eventAsset) => String(eventAsset).toUpperCase() === normalizedAsset))
+    .flatMap((event) => {
+      const periods = Array.isArray(event.periods) ? event.periods : [];
+      return periods
+        .map(parseEventPeriod)
+        .filter(Boolean)
+        .map((period) => ({
+          ...period,
+          title: event.title,
+          code: event.code,
+          url: event.url,
+        }));
+    })
+    .sort((a, b) => a.startTime - b.startTime);
+  const stored = loadStoredEarnEventPeriods(asset);
+
+  return [...new Map([...stored, ...fetched].map((event) => [
+    `${event.code}:${event.startTime}:${event.endTime}`,
+    event,
+  ])).values()].sort((a, b) => a.startTime - b.startTime);
+}
+
 async function fetchEarnRateHistory({ asset, startTime, endTime }) {
   try {
     const product = await fetchFlexibleEarnProduct(asset);
@@ -127,6 +204,8 @@ async function fetchEarnRateHistory({ asset, startTime, endTime }) {
         productId: null,
         rows: [],
         error: "Flexible Earn product was not found for this asset",
+        bonusTiers: [],
+        bonusEvents: [],
       };
     }
 
@@ -149,6 +228,8 @@ async function fetchEarnRateHistory({ asset, startTime, endTime }) {
           productId: product.productId,
           rows: [],
           error: result.data?.msg ?? "Flexible Earn rate history fetch failed",
+          bonusTiers: parseBonusTiers(product, asset),
+          bonusEvents: [],
         };
       }
 
@@ -173,6 +254,8 @@ async function fetchEarnRateHistory({ asset, startTime, endTime }) {
       productId: product.productId,
       rows: rows.sort((a, b) => a.time - b.time),
       error: rows.length > 0 ? null : "Flexible Earn rate history returned no rows",
+      bonusTiers: parseBonusTiers(product, asset),
+      bonusEvents: await safeFetchEarnBonusEvents(asset),
     };
   } catch (error) {
     return {
@@ -181,6 +264,8 @@ async function fetchEarnRateHistory({ asset, startTime, endTime }) {
       productId: null,
       rows: [],
       error: error instanceof Error ? error.message : "Flexible Earn rate history fetch failed",
+      bonusTiers: [],
+      bonusEvents: [],
     };
   }
 }
@@ -261,6 +346,8 @@ export function calculateStrategyBacktest({
   earnHistorySource = "manual",
   earnProductId = null,
   earnHistoryError = null,
+  earnBonusTiers = [],
+  earnBonusEvents = [],
   futuresLeverage = 1,
   spotFeeRate = 0.001,
   futuresFeeRate = 0.0005,
@@ -309,20 +396,63 @@ export function calculateStrategyBacktest({
     }
     return selected.annualPercentageRate;
   };
+  const bonusCapitalTiers = earnBonusTiers.map((tier) => ({
+    ...tier,
+    fromCapital: tier.fromQty * firstSpot.close,
+    toCapital: tier.toQty * firstSpot.close,
+  }));
+  const activeBonusEventsForTime = (time) => earnBonusEvents.filter((event) => event.startTime <= time && time <= event.endTime);
+  const hasEventForTime = (time) => activeBonusEventsForTime(time).length > 0;
+  const bonusAprCapitalForTime = (capital, time) => {
+    if (!hasEventForTime(time) || bonusCapitalTiers.length === 0 || capital <= 0) {
+      return 0;
+    }
+
+    return bonusCapitalTiers.reduce((sum, tier) => {
+      const eligibleCapital = Math.max(Math.min(capital, tier.toCapital) - tier.fromCapital, 0);
+      return sum + eligibleCapital * tier.apr;
+    }, 0);
+  };
+  const maxBonusEligibleCapital = bonusCapitalTiers.reduce((sum, tier) => {
+    const eligibleCapital = Math.max(Math.min(principal, tier.toCapital) - tier.fromCapital, 0);
+    return sum + eligibleCapital;
+  }, 0);
+  const maxBonusCapCapital = bonusCapitalTiers.reduce((sum, tier) => sum + Math.max(tier.toCapital - tier.fromCapital, 0), 0);
 
   let earnedQty = 0;
+  let baseEarnedQty = 0;
+  let bonusEarnedQty = 0;
   let weightedAprDays = 0;
+  let weightedBaseAprDays = 0;
+  let weightedBonusAprDays = 0;
+  let bonusAppliedDays = 0;
   let previousEarnTime = firstSpot.openTime;
   for (const spotCandle of spotKlines) {
     const intervalDays = Math.max((spotCandle.closeTime - previousEarnTime) / DAY_MS, 0);
-    const intervalApr = rateForTime(spotCandle.openTime);
-    earnedQty += spotQty * intervalApr * (intervalDays / 365);
-    weightedAprDays += intervalApr * intervalDays;
+    const baseApr = rateForTime(spotCandle.openTime);
+    const bonusAprCapital = bonusAprCapitalForTime(principal, spotCandle.openTime);
+    const intervalBaseEarnedQty = spotQty * baseApr * (intervalDays / 365);
+    const intervalBonusEarnedQty = firstSpot.close > 0 ? (bonusAprCapital / firstSpot.close) * (intervalDays / 365) : 0;
+    const effectiveBonusApr = principal > 0 ? bonusAprCapital / principal : 0;
+
+    baseEarnedQty += intervalBaseEarnedQty;
+    bonusEarnedQty += intervalBonusEarnedQty;
+    earnedQty += intervalBaseEarnedQty + intervalBonusEarnedQty;
+    weightedBaseAprDays += baseApr * intervalDays;
+    weightedBonusAprDays += effectiveBonusApr * intervalDays;
+    weightedAprDays += (baseApr + effectiveBonusApr) * intervalDays;
+    if (effectiveBonusApr > 0) {
+      bonusAppliedDays += intervalDays;
+    }
     previousEarnTime = spotCandle.closeTime;
   }
 
   const earnPnl = earnedQty * lastSpot.close;
+  const baseEarnPnl = baseEarnedQty * lastSpot.close;
+  const bonusEarnPnl = bonusEarnedQty * lastSpot.close;
   const averageEarnApr = actualDays > 0 ? weightedAprDays / actualDays : earnApr;
+  const averageBaseApr = actualDays > 0 ? weightedBaseAprDays / actualDays : earnApr;
+  const averageBonusApr = actualDays > 0 ? weightedBonusAprDays / actualDays : 0;
   const spotFees = principal * spotFeeRate + exitSpotValue * spotFeeRate;
   const futuresFees = shortNotional * futuresFeeRate + exitFuturesNotional * futuresFeeRate;
   const spotSlippage = (principal + exitSpotValue) * slippageRate;
@@ -335,6 +465,8 @@ export function calculateStrategyBacktest({
   let cumulativeFunding = 0;
   let fundingIndex = 0;
   let cumulativeEarnedQty = 0;
+  let cumulativeBaseEarnedQty = 0;
+  let cumulativeBonusEarnedQty = 0;
   let previousSeriesEarnTime = firstSpot.openTime;
   const series = spotKlines.map((spotCandle) => {
     const futuresCandle = nearestFutureCandle(futuresKlines, spotCandle.openTime);
@@ -344,8 +476,12 @@ export function calculateStrategyBacktest({
     }
 
     const intervalDays = Math.max((spotCandle.closeTime - previousSeriesEarnTime) / DAY_MS, 0);
-    const currentApr = rateForTime(spotCandle.openTime);
-    cumulativeEarnedQty += spotQty * currentApr * (intervalDays / 365);
+    const currentBaseApr = rateForTime(spotCandle.openTime);
+    const currentBonusAprCapital = bonusAprCapitalForTime(principal, spotCandle.openTime);
+    const currentBonusApr = principal > 0 ? currentBonusAprCapital / principal : 0;
+    cumulativeBaseEarnedQty += spotQty * currentBaseApr * (intervalDays / 365);
+    cumulativeBonusEarnedQty += firstSpot.close > 0 ? (currentBonusAprCapital / firstSpot.close) * (intervalDays / 365) : 0;
+    cumulativeEarnedQty = cumulativeBaseEarnedQty + cumulativeBonusEarnedQty;
     previousSeriesEarnTime = spotCandle.closeTime;
     const currentSpotValue = spotQty * spotCandle.close;
     const currentFuturesNotional = futuresQty * futuresCandle.close;
@@ -361,7 +497,9 @@ export function calculateStrategyBacktest({
       time: new Date(spotCandle.closeTime).toISOString(),
       spotClose: spotCandle.close,
       futuresClose: futuresCandle.close,
-      earnApr: currentApr,
+      earnApr: currentBaseApr + currentBonusApr,
+      baseEarnApr: currentBaseApr,
+      bonusEarnApr: currentBonusApr,
       fundingPnl: cumulativeFunding,
       earnOnlyPnl: currentEarnPnl + currentSpotPnl - currentSpotFees - currentSpotSlippage,
       shortOnlyPnl: currentShortPnl + cumulativeFunding - currentFuturesFees - currentFuturesSlippage,
@@ -402,6 +540,8 @@ export function calculateStrategyBacktest({
     },
     components: {
       earnPnl,
+      baseEarnPnl,
+      bonusEarnPnl,
       spotPricePnl,
       shortPricePnl,
       fundingPnl: funding.fundingPnl,
@@ -422,8 +562,16 @@ export function calculateStrategyBacktest({
       productId: earnProductId,
       records: sortedEarnRates.length,
       averageApr: averageEarnApr,
+      averageBaseApr,
+      averageBonusApr,
       fallbackApr: earnApr,
       latestApr: sortedEarnRates.at(-1)?.annualPercentageRate ?? earnApr,
+      bonusTiers: earnBonusTiers,
+      bonusCapitalTiers,
+      bonusEvents: earnBonusEvents,
+      bonusAppliedDays,
+      bonusEligibleCapital: maxBonusEligibleCapital,
+      bonusCapCapital: maxBonusCapCapital,
       error: sortedEarnRates.length > 0 ? null : earnHistoryError,
     },
     results: {
@@ -495,6 +643,8 @@ export async function runStrategyBacktest(params) {
     earnHistorySource: earnHistory.source,
     earnProductId: earnHistory.productId,
     earnHistoryError: earnHistory.error,
+    earnBonusTiers: earnHistory.bonusTiers,
+    earnBonusEvents: earnHistory.bonusEvents,
     futuresLeverage,
     spotFeeRate,
     futuresFeeRate,

@@ -83,10 +83,33 @@ export type StrategyBacktestPoint = {
   spotClose: number;
   futuresClose: number;
   earnApr: number;
+  baseEarnApr?: number;
+  bonusEarnApr?: number;
   fundingPnl: number;
   earnOnlyPnl: number;
   shortOnlyPnl: number;
   combinedPnl: number;
+};
+
+export type EarnBonusTier = {
+  range: string;
+  fromQty: number;
+  toQty: number;
+  asset: string;
+  apr: number;
+};
+
+export type EarnBonusCapitalTier = EarnBonusTier & {
+  fromCapital: number;
+  toCapital: number;
+};
+
+export type EarnBonusEvent = {
+  startTime: number;
+  endTime: number;
+  title: string;
+  code: string;
+  url: string;
 };
 
 export type StrategyBacktest = {
@@ -121,6 +144,8 @@ export type StrategyBacktest = {
   };
   components: {
     earnPnl: number;
+    baseEarnPnl?: number;
+    bonusEarnPnl?: number;
     spotPricePnl: number;
     shortPricePnl: number;
     fundingPnl: number;
@@ -141,8 +166,16 @@ export type StrategyBacktest = {
     productId: string | null;
     records: number;
     averageApr: number;
+    averageBaseApr?: number;
+    averageBonusApr?: number;
     fallbackApr: number;
     latestApr: number;
+    bonusTiers?: EarnBonusTier[];
+    bonusCapitalTiers?: EarnBonusCapitalTier[];
+    bonusEvents?: EarnBonusEvent[];
+    bonusAppliedDays?: number;
+    bonusEligibleCapital?: number;
+    bonusCapCapital?: number;
     error: string | null;
   };
   results: {

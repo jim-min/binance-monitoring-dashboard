@@ -2,7 +2,10 @@ const BINANCE_WEB_BASE_URL = "https://www.binance.com";
 const ACTIVITY_CATALOG_ID = "93";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+import { readFileSync, writeFileSync } from "node:fs";
+
 const eventCache = new Map();
+const earnEventPeriodsFile = new URL("../.earn-event-periods.json", import.meta.url);
 
 async function fetchBinanceCms(path, params = {}) {
   const query = new URLSearchParams(params);
@@ -128,6 +131,86 @@ function extractSignals(text) {
   };
 }
 
+const parseUtcDateTime = (date, hour, minute, second = "0") => Date.UTC(
+  Number(date.slice(0, 4)),
+  Number(date.slice(5, 7)) - 1,
+  Number(date.slice(8, 10)),
+  Number(hour),
+  Number(minute),
+  Number(second),
+);
+
+export const parseEventPeriodText = (text) => {
+  const normalized = normalizeSpaces(text);
+  const match = normalized.match(
+    /(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?\s*(?:\(UTC\)|UTC)?\s*(?:to|-|–)\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?\s*(?:\(UTC\)|UTC)?/i,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const startTime = parseUtcDateTime(match[1], match[2], match[3], match[4] ?? "0");
+  const endTime = parseUtcDateTime(match[5], match[6], match[7], match[8] ?? "59");
+
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
+    return null;
+  }
+
+  return { startTime, endTime };
+};
+
+const loadStoredPeriods = () => {
+  try {
+    const state = JSON.parse(readFileSync(earnEventPeriodsFile, "utf8"));
+    return Array.isArray(state.periods) ? state.periods : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredPeriods = (periods) => {
+  writeFileSync(earnEventPeriodsFile, JSON.stringify({
+    periods,
+    updatedAt: new Date().toISOString(),
+  }, null, 2));
+};
+
+const persistEarnEventPeriods = (events) => {
+  const nextPeriods = events
+    .filter(isAprEvent)
+    .flatMap((event) => (event.periods ?? [])
+      .map(parseEventPeriodText)
+      .filter(Boolean)
+      .flatMap((period) => (event.assets ?? []).map((asset) => ({
+        asset: String(asset).toUpperCase(),
+        startTime: period.startTime,
+        endTime: period.endTime,
+        title: event.title,
+        code: event.code,
+        url: event.url,
+      }))));
+
+  if (nextPeriods.length === 0) {
+    return;
+  }
+
+  const merged = [...loadStoredPeriods(), ...nextPeriods];
+  const deduped = [...new Map(merged.map((period) => [
+    `${period.asset}:${period.code}:${period.startTime}:${period.endTime}`,
+    period,
+  ])).values()].sort((a, b) => a.startTime - b.startTime);
+  saveStoredPeriods(deduped);
+};
+
+export const loadStoredEarnEventPeriods = (asset) => {
+  const normalizedAsset = String(asset ?? "").toUpperCase();
+  return loadStoredPeriods()
+    .filter((period) => String(period.asset ?? "").toUpperCase() === normalizedAsset)
+    .map(({ asset: _asset, ...period }) => period)
+    .sort((a, b) => a.startTime - b.startTime);
+};
+
 function classifyEvent(text) {
   if (/simple earn|earn|staking|locked product|flexible product|apr|apy/i.test(text)) {
     return "earn";
@@ -249,6 +332,7 @@ export async function fetchEarningEvents({ pageNo = "1", pageSize = "12", detail
   }));
   const lightweight = articles.slice(detailLimit).map(mapLightweightArticle);
   const rows = [...detailed, ...lightweight];
+  persistEarnEventPeriods(rows);
 
   const data = {
     catalogId: Number(ACTIVITY_CATALOG_ID),

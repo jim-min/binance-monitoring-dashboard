@@ -91,6 +91,46 @@ test("calculateStrategyBacktest uses time-varying Earn APR history when availabl
   assertAlmostEqual(result.series[1].earnApr, 0.73);
 });
 
+test("calculateStrategyBacktest applies event bonus APR by USDT capital within tier cap and event period", () => {
+  const result = calculateStrategyBacktest({
+    symbol: "ABCUSDT",
+    requestedDays: 2,
+    principal: 1000,
+    earnApr: 0.1,
+    spotFeeRate: 0,
+    futuresFeeRate: 0,
+    slippageRate: 0,
+    interval: "1d",
+    spotKlines: [candle(0, 10), candle(1, 10)],
+    futuresKlines: [candle(0, 10), candle(1, 10)],
+    fundingRates: [],
+    earnRateHistory: [
+      { time: 0, annualPercentageRate: 0.365 },
+    ],
+    earnHistorySource: "history",
+    earnProductId: "ABC001",
+    earnBonusTiers: [
+      { range: "0-50ABC", fromQty: 0, toQty: 50, asset: "ABC", apr: 0.365 },
+    ],
+    earnBonusEvents: [
+      { startTime: 0, endTime: 2 * day, title: "ABC Earn Event", code: "abc-event", url: "https://example.com" },
+    ],
+  });
+
+  assertAlmostEqual(result.earn.averageBaseApr, 0.365);
+  assertAlmostEqual(result.earn.averageBonusApr, 0.1825);
+  assertAlmostEqual(result.earn.averageApr, 0.5475);
+  assertAlmostEqual(result.earn.bonusEligibleCapital, 500);
+  assertAlmostEqual(result.earn.bonusCapCapital, 500);
+  assertAlmostEqual(result.earn.bonusCapitalTiers[0].toCapital, 500);
+  assertAlmostEqual(result.components.baseEarnPnl, 2);
+  assertAlmostEqual(result.components.bonusEarnPnl, 1);
+  assertAlmostEqual(result.components.earnPnl, 3);
+  assertAlmostEqual(result.series[0].baseEarnApr, 0.365);
+  assertAlmostEqual(result.series[0].bonusEarnApr, 0.1825);
+  assertAlmostEqual(result.series[0].earnApr, 0.5475);
+});
+
 test("calculateStrategyBacktest rejects insufficient candle data", () => {
   assert.throws(() => calculateStrategyBacktest({
     spotKlines: [candle(0, 10)],
